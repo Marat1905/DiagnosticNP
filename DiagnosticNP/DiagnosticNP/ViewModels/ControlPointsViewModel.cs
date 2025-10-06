@@ -16,6 +16,8 @@ namespace DiagnosticNP.ViewModels
         private readonly IDatabaseService _databaseService;
         private string _nfcFilter;
         private string _filterInfo;
+        private List<ControlPointNode> _allNodes;
+        private bool _isToggling = false;
 
         public ControlPointsViewModel(IDatabaseService databaseService, string nfcFilter = null)
         {
@@ -24,6 +26,7 @@ namespace DiagnosticNP.ViewModels
             _filterInfo = string.IsNullOrEmpty(nfcFilter) ? "Нет активного фильтра" : $"Фильтр: {nfcFilter}";
 
             DisplayNodes = new ObservableCollection<ControlPointNode>();
+            _allNodes = new List<ControlPointNode>();
             InitializeCommands();
         }
 
@@ -38,12 +41,14 @@ namespace DiagnosticNP.ViewModels
         public ICommand AddMeasurementCommand { get; private set; }
         public ICommand ResetFilterCommand { get; private set; }
         public ICommand ToggleNodeCommand { get; private set; }
+        public ICommand LoadDataCommand { get; private set; }
 
         private void InitializeCommands()
         {
             AddMeasurementCommand = new Command<ControlPointNode>(async (node) => await AddMeasurement(node));
             ResetFilterCommand = new Command(ResetFilter);
             ToggleNodeCommand = new Command<ControlPointNode>((node) => ToggleNode(node));
+            LoadDataCommand = new Command(() => LoadData());
         }
 
         public async void LoadData()
@@ -52,6 +57,7 @@ namespace DiagnosticNP.ViewModels
 
             IsBusy = true;
             StatusMessage = "Загрузка данных...";
+            StatusColor = Color.FromHex("#3498DB");
 
             try
             {
@@ -75,24 +81,24 @@ namespace DiagnosticNP.ViewModels
                 }
 
                 // Построение дерева
-                var rootNodes = BuildTree(filteredPoints);
+                _allNodes = BuildTree(filteredPoints);
 
                 // Обновление отображаемых узлов
-                UpdateDisplayNodes(rootNodes);
+                UpdateDisplayNodes();
 
                 StatusMessage = $"Найдено {filteredPoints.Count} точек из {controlPoints.Count}";
-                StatusColor = filteredPoints.Any() ? Color.Green : Color.Orange;
+                StatusColor = filteredPoints.Any() ? Color.FromHex("#27AE60") : Color.FromHex("#E67E22");
 
                 if (!string.IsNullOrEmpty(_nfcFilter) && !filteredPoints.Any())
                 {
                     StatusMessage = $"По запросу '{_nfcFilter}' ничего не найдено";
-                    StatusColor = Color.Orange;
+                    StatusColor = Color.FromHex("#E67E22");
                 }
             }
             catch (System.Exception ex)
             {
                 StatusMessage = $"Ошибка загрузки: {ex.Message}";
-                StatusColor = Color.Red;
+                StatusColor = Color.FromHex("#E74C3C");
             }
             finally
             {
@@ -105,14 +111,12 @@ namespace DiagnosticNP.ViewModels
             if (string.IsNullOrEmpty(nfcData))
                 return points;
 
-            // Нормализуем NFC данные: убираем лишние пробелы, приводим к нижнему регистру
             var normalizedNfcData = nfcData.ToLowerInvariant()
                 .Replace(":", "")
                 .Replace(".", "")
                 .Replace(",", "")
                 .Trim();
 
-            // Разбиваем на ключевые слова
             var keywords = normalizedNfcData.Split(new[] { ' ', '\t', '\n', '\r' },
                 StringSplitOptions.RemoveEmptyEntries);
 
@@ -123,11 +127,8 @@ namespace DiagnosticNP.ViewModels
             {
                 if (p?.FullPath == null) return false;
 
-                // Нормализуем полный путь точки
                 var normalizedPath = p.FullPath.ToLowerInvariant();
 
-                // Проверяем, содержатся ли все ключевые слова в пути
-                // Или путь содержит основную часть NFC данных
                 return keywords.All(keyword => normalizedPath.Contains(keyword)) ||
                        normalizedPath.Contains(normalizedNfcData) ||
                        IsPartialMatch(normalizedPath, normalizedNfcData);
@@ -136,11 +137,9 @@ namespace DiagnosticNP.ViewModels
 
         private bool IsPartialMatch(string path, string nfcData)
         {
-            // Разбиваем путь на компоненты
             var pathComponents = path.Split('/');
             var nfcComponents = nfcData.Split(' ');
 
-            // Проверяем совпадение основных компонентов
             var matches = 0;
             foreach (var nfcComponent in nfcComponents)
             {
@@ -152,49 +151,7 @@ namespace DiagnosticNP.ViewModels
                 }
             }
 
-            // Считаем совпадением если больше половины компонентов совпало
             return matches >= nfcComponents.Length / 2;
-        }
-
-        private List<ControlPointNode> BuildTree(List<ControlPoint> points)
-        {
-            var nodes = new List<ControlPointNode>();
-
-            // Сначала собираем все точки, которые подходят под фильтр
-            var filteredPoints = points.ToList();
-
-            // Затем добавляем их родителей для построения полного дерева
-            var pointsWithParents = new List<ControlPoint>(filteredPoints);
-
-            foreach (var point in filteredPoints)
-            {
-                AddParentChain(point, points, pointsWithParents);
-            }
-
-            // Строим дерево из полного набора точек
-            var rootPoints = pointsWithParents.Where(p => p.Level == 0).ToList();
-
-            foreach (var root in rootPoints)
-            {
-                var node = new ControlPointNode(root);
-                BuildNodeChildren(node, pointsWithParents);
-                nodes.Add(node);
-            }
-
-            return nodes;
-        }
-
-        private void AddParentChain(ControlPoint point, List<ControlPoint> allPoints, List<ControlPoint> result)
-        {
-            if (point.ParentId.HasValue)
-            {
-                var parent = allPoints.FirstOrDefault(p => p.Id == point.ParentId.Value);
-                if (parent != null && !result.Contains(parent))
-                {
-                    result.Add(parent);
-                    AddParentChain(parent, allPoints, result);
-                }
-            }
         }
 
         private List<ControlPoint> EnhancedNfcSearch(List<ControlPoint> points, string nfcData)
@@ -205,12 +162,10 @@ namespace DiagnosticNP.ViewModels
             var results = new List<ControlPoint>();
             var normalizedNfc = nfcData.ToLowerInvariant();
 
-            // 1. Поиск точного совпадения в полном пути
             var exactMatches = points.Where(p =>
                 p.FullPath?.ToLowerInvariant().Contains(normalizedNfc) == true).ToList();
             results.AddRange(exactMatches);
 
-            // 2. Поиск по отдельным компонентам
             var components = normalizedNfc.Split(new[] { ' ', ':', ',', ';' },
                 StringSplitOptions.RemoveEmptyEntries);
 
@@ -223,7 +178,6 @@ namespace DiagnosticNP.ViewModels
                 results.AddRange(componentMatches.Where(m => !results.Contains(m)));
             }
 
-            // 3. Поиск по синонимам и вариациям
             var variations = GetSearchVariations(normalizedNfc);
             foreach (var variation in variations)
             {
@@ -240,7 +194,6 @@ namespace DiagnosticNP.ViewModels
         {
             var variations = new List<string>();
 
-            // Добавляем различные вариации поискового запроса
             if (searchTerm.Contains("сушильная"))
             {
                 variations.Add("сушильная группа");
@@ -268,9 +221,36 @@ namespace DiagnosticNP.ViewModels
             return variations;
         }
 
+        private List<ControlPointNode> BuildTree(List<ControlPoint> points)
+        {
+            if (points == null || !points.Any())
+                return new List<ControlPointNode>();
+
+            // Сортируем точки по уровню и имени для правильного порядка
+            var sortedPoints = points
+                .OrderBy(p => p.Level)
+                .ThenBy(p => p.Name)
+                .ToList();
+
+            var nodes = new List<ControlPointNode>();
+            var rootPoints = sortedPoints.Where(p => p.Level == 0).ToList();
+
+            foreach (var root in rootPoints)
+            {
+                var node = new ControlPointNode(root);
+                BuildNodeChildren(node, sortedPoints);
+                nodes.Add(node);
+            }
+
+            return nodes;
+        }
+
         private void BuildNodeChildren(ControlPointNode parent, List<ControlPoint> allPoints)
         {
-            var children = allPoints.Where(p => p.ParentId == parent.ControlPoint.Id).ToList();
+            var children = allPoints
+                .Where(p => p.ParentId == parent.ControlPoint.Id)
+                .OrderBy(p => p.Name)
+                .ToList();
 
             foreach (var child in children)
             {
@@ -280,13 +260,13 @@ namespace DiagnosticNP.ViewModels
             }
         }
 
-        private void UpdateDisplayNodes(List<ControlPointNode> rootNodes)
+        private void UpdateDisplayNodes()
         {
             DisplayNodes.Clear();
-            foreach (var node in rootNodes)
+            foreach (var node in _allNodes)
             {
                 DisplayNodes.Add(node);
-                if (node.IsExpanded)
+                if (node.IsExpanded && node.HasChildren)
                 {
                     AddChildrenToDisplay(node);
                 }
@@ -295,43 +275,99 @@ namespace DiagnosticNP.ViewModels
 
         private void AddChildrenToDisplay(ControlPointNode parent)
         {
-            var index = DisplayNodes.IndexOf(parent) + 1;
-            foreach (var child in parent.Children)
+            var parentIndex = DisplayNodes.IndexOf(parent);
+            if (parentIndex == -1) return;
+
+            var insertIndex = parentIndex + 1;
+
+            // Добавляем детей в правильном порядке
+            foreach (var child in parent.Children.OrderBy(c => c.Name))
             {
-                DisplayNodes.Insert(index, child);
-                index++;
-                if (child.IsExpanded)
+                // Проверяем, не добавлен ли уже этот узел
+                if (!DisplayNodes.Contains(child))
+                {
+                    DisplayNodes.Insert(insertIndex, child);
+                    insertIndex++;
+                }
+
+                // Рекурсивно добавляем раскрытых детей
+                if (child.IsExpanded && child.HasChildren)
                 {
                     AddChildrenToDisplay(child);
+                    // Обновляем индекс после добавления вложенных элементов
+                    insertIndex = DisplayNodes.IndexOf(child) + child.GetVisibleChildrenCount() + 1;
                 }
             }
         }
 
         private void RemoveChildrenFromDisplay(ControlPointNode parent)
         {
+            var childrenToRemove = new List<ControlPointNode>();
+            CollectChildrenForRemoval(parent, childrenToRemove);
+
+            // Удаляем в обратном порядке чтобы не нарушать индексы
+            for (int i = childrenToRemove.Count - 1; i >= 0; i--)
+            {
+                var child = childrenToRemove[i];
+                if (DisplayNodes.Contains(child))
+                {
+                    DisplayNodes.Remove(child);
+                }
+            }
+        }
+
+        private void CollectChildrenForRemoval(ControlPointNode parent, List<ControlPointNode> childrenToRemove)
+        {
             foreach (var child in parent.Children)
             {
-                DisplayNodes.Remove(child);
+                childrenToRemove.Add(child);
                 if (child.IsExpanded)
                 {
-                    RemoveChildrenFromDisplay(child);
+                    CollectChildrenForRemoval(child, childrenToRemove);
+                    // Сбрасываем состояние раскрытия у удаляемых детей
+                    child.IsExpanded = false;
                 }
             }
         }
 
         private void ToggleNode(ControlPointNode node)
         {
-            if (node == null || !node.HasChildren) return;
+            if (node == null || !node.HasChildren || _isToggling)
+                return;
 
-            node.IsExpanded = !node.IsExpanded;
+            _isToggling = true;
 
-            if (node.IsExpanded)
+            try
             {
-                AddChildrenToDisplay(node);
+                var wasExpanded = node.IsExpanded;
+                node.IsExpanded = !node.IsExpanded;
+
+                if (node.IsExpanded)
+                {
+                    // Добавляем детей
+                    AddChildrenToDisplay(node);
+                }
+                else
+                {
+                    // Удаляем детей
+                    RemoveChildrenFromDisplay(node);
+                }
+
+                // Принудительно обновляем интерфейс
+                Device.BeginInvokeOnMainThread(() =>
+                {
+                    // Обновляем коллекцию для принудительного обновления UI
+                    var tempList = new List<ControlPointNode>(DisplayNodes);
+                    DisplayNodes.Clear();
+                    foreach (var item in tempList)
+                    {
+                        DisplayNodes.Add(item);
+                    }
+                });
             }
-            else
+            finally
             {
-                RemoveChildrenFromDisplay(node);
+                _isToggling = false;
             }
         }
 
@@ -370,15 +406,51 @@ namespace DiagnosticNP.ViewModels
         public bool IsExpanded
         {
             get => _isExpanded;
-            set => SetProperty(ref _isExpanded, value);
+            set
+            {
+                if (_isExpanded != value)
+                {
+                    _isExpanded = value;
+                    OnPropertyChanged(nameof(IsExpanded));
+
+                    // Принудительно обновляем отображение иконки
+                    OnPropertyChanged(nameof(HasChildren));
+                }
+            }
         }
 
         public ControlPointNode(ControlPoint controlPoint)
         {
             ControlPoint = controlPoint;
             Children = new List<ControlPointNode>();
-            // По умолчанию раскрываем первые два уровня для удобства
-            IsExpanded = Level < 2;
+            // Раскрываем только корневые узлы по умолчанию
+            IsExpanded = Level == 0;
+        }
+
+        public int GetVisibleChildrenCount()
+        {
+            var count = 0;
+            foreach (var child in Children)
+            {
+                count++; // Сам ребенок
+                if (child.IsExpanded)
+                {
+                    count += child.GetVisibleChildrenCount();
+                }
+            }
+            return count;
+        }
+
+        // Переопределяем Equals и GetHashCode для правильной работы коллекций
+        public override bool Equals(object obj)
+        {
+            return obj is ControlPointNode node &&
+                   ControlPoint?.Id == node.ControlPoint?.Id;
+        }
+
+        public override int GetHashCode()
+        {
+            return ControlPoint?.Id.GetHashCode() ?? 0;
         }
     }
 }

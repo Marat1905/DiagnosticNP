@@ -1,77 +1,195 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:converters="clr-namespace:DiagnosticNP.Converters"
              x:Class="DiagnosticNP.Views.ControlPointsPage"
-             Title="Контрольные точки">
+             Title="Контрольные точки"
+             BackgroundColor="#F8F9FA">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <Style x:Key="SectionHeaderStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="18"/>
+                <Setter Property="FontAttributes" Value="Bold"/>
+                <Setter Property="TextColor" Value="#2C3E50"/>
+                <Setter Property="HorizontalOptions" Value="Start"/>
+                <Setter Property="Margin" Value="0,0,0,10"/>
+            </Style>
+
+            <Style x:Key="NodeHeaderStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="16"/>
+                <Setter Property="FontAttributes" Value="Bold"/>
+                <Setter Property="TextColor" Value="#34495E"/>
+                <Setter Property="VerticalOptions" Value="Center"/>
+            </Style>
+
+            <Style x:Key="NodePathStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="TextColor" Value="#7F8C8D"/>
+                <Setter Property="VerticalOptions" Value="Center"/>
+            </Style>
+
+            <Style x:Key="MeasurementButtonStyle" TargetType="Button">
+                <Setter Property="BackgroundColor" Value="#27AE60"/>
+                <Setter Property="TextColor" Value="White"/>
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="HeightRequest" Value="35"/>
+                <Setter Property="CornerRadius" Value="8"/>
+                <Setter Property="Padding" Value="12,0"/>
+            </Style>
+
+            <Style x:Key="ExpandButtonStyle" TargetType="Button">
+                <Setter Property="BackgroundColor" Value="#BDC3C7"/>
+                <Setter Property="TextColor" Value="White"/>
+                <Setter Property="FontSize" Value="10"/>
+                <Setter Property="WidthRequest" Value="24"/>
+                <Setter Property="HeightRequest" Value="24"/>
+                <Setter Property="CornerRadius" Value="12"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="Margin" Value="0"/>
+            </Style>
+        </ResourceDictionary>
+    </ContentPage.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Поиск и фильтры -->
-        <StackLayout Grid.Row="0" Padding="10" BackgroundColor="#F5F5F5">
-            <Label Text="Фильтр по NFC:" FontAttributes="Bold"/>
-            <Label Text="{Binding FilterInfo}" FontSize="12" TextColor="Gray"/>
-            <Button Text="Сбросить фильтр" 
-                    Command="{Binding ResetFilterCommand}"
-                    Style="{StaticResource PrimaryButton}"
-                    Margin="0,5,0,0"/>
-        </StackLayout>
+        <!-- Шапка с фильтром -->
+        <Frame Grid.Row="0" 
+               BackgroundColor="#3498DB" 
+               Padding="15" 
+               CornerRadius="0" 
+               HasShadow="True">
+            <StackLayout>
+                <Label Text="Фильтр по NFC" 
+                       Style="{StaticResource SectionHeaderStyle}"
+                       TextColor="White"/>
+                <Label Text="{Binding FilterInfo}" 
+                       FontSize="14" 
+                       TextColor="#ECF0F1"
+                       Margin="0,5,0,10"/>
+                <Button Text="СБРОСИТЬ ФИЛЬТР" 
+                        Command="{Binding ResetFilterCommand}"
+                        BackgroundColor="#E74C3C"
+                        TextColor="White"
+                        FontAttributes="Bold"
+                        CornerRadius="8"
+                        HeightRequest="40"/>
+            </StackLayout>
+        </Frame>
 
         <!-- Дерево контрольных точек -->
-        <CollectionView Grid.Row="1" ItemsSource="{Binding DisplayNodes}">
-            <CollectionView.ItemTemplate>
-                <DataTemplate>
-                    <Grid Padding="10,5" BackgroundColor="Transparent">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="{Binding Level, Converter={StaticResource LevelToWidthConverter}}"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
+        <RefreshView Grid.Row="1"
+                     IsRefreshing="{Binding IsBusy}"
+                     Command="{Binding LoadDataCommand}">
+            <CollectionView ItemsSource="{Binding DisplayNodes}"
+                            SelectionMode="None"
+                            BackgroundColor="Transparent">
+                <CollectionView.EmptyView>
+                    <StackLayout VerticalOptions="Center" HorizontalOptions="Center" Padding="40">
+                        <Label Text="📋" FontSize="48" HorizontalOptions="Center"/>
+                        <Label Text="Нет данных для отображения" 
+                               FontSize="16" 
+                               TextColor="#95A5A6" 
+                               HorizontalTextAlignment="Center"
+                               Margin="0,10,0,0"/>
+                        <Label Text="{Binding StatusMessage}" 
+                               FontSize="14" 
+                               TextColor="#BDC3C7"
+                               HorizontalTextAlignment="Center"
+                               Margin="0,5,0,0"/>
+                    </StackLayout>
+                </CollectionView.EmptyView>
 
-                        <!-- Отступ для уровня вложенности -->
-                        <BoxView Grid.Column="0" BackgroundColor="Transparent"/>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="15,8" BackgroundColor="Transparent">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{Binding Level, Converter={StaticResource LevelToWidthConverter}}"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
 
-                        <!-- Кнопка раскрытия/скрытия -->
-                        <Label Grid.Column="1" 
-                               Text="{Binding IsExpanded, Converter={StaticResource ExpandedToIconConverter}}"
-                               FontSize="16"
-                               VerticalOptions="Center"
-                               HorizontalOptions="Center"
-                               WidthRequest="30"
-                               IsVisible="{Binding HasChildren}">
-                            <Label.GestureRecognizers>
-                                <TapGestureRecognizer Command="{Binding BindingContext.ToggleNodeCommand, Source={RelativeSource AncestorType={x:Type ContentPage}}}" 
-                                                      CommandParameter="{Binding .}"/>
-                            </Label.GestureRecognizers>
-                        </Label>
+                            <!-- Градиентный отступ для уровня вложенности -->
+                            <BoxView Grid.Column="0" 
+                                     BackgroundColor="{Binding Level, Converter={StaticResource LevelToColorConverter}}"
+                                     CornerRadius="2"
+                                     WidthRequest="4"
+                                     HorizontalOptions="Start"
+                                     VerticalOptions="Fill"/>
 
-                        <!-- Информация о точке -->
-                        <StackLayout Grid.Column="2" Spacing="2" VerticalOptions="Center">
-                            <Label Text="{Binding Name}" 
-                                   FontSize="16" 
-                                   FontAttributes="{Binding IsMeasurementPoint, Converter={StaticResource BoolToBoldConverter}}"/>
-                            <Label Text="{Binding Path}" 
-                                   FontSize="12" 
-                                   TextColor="Gray"
-                                   IsVisible="{Binding IsMeasurementPoint}"/>
-                        </StackLayout>
+                            <!-- Иконка узла -->
+                            <Frame Grid.Column="1"
+                                   BackgroundColor="{Binding IsMeasurementPoint, Converter={StaticResource NodeTypeToColorConverter}}"
+                                   Padding="0"
+                                   CornerRadius="20"
+                                   WidthRequest="36"
+                                   HeightRequest="36"
+                                   VerticalOptions="Center"
+                                   HorizontalOptions="Center">
+                                <Label Text="{Binding IsMeasurementPoint, Converter={StaticResource NodeTypeToIconConverter}}"
+                                       FontSize="16"
+                                       TextColor="White"
+                                       HorizontalOptions="Center"
+                                       VerticalOptions="Center"/>
+                            </Frame>
 
-                        <!-- Кнопка добавления замера -->
-                        <Button Grid.Column="3" 
-                                Text="Добавить замер" 
-                                Command="{Binding BindingContext.AddMeasurementCommand, Source={RelativeSource AncestorType={x:Type ContentPage}}}"
-                                CommandParameter="{Binding .}"
-                                Style="{StaticResource SuccessButton}"
-                                FontSize="12"
-                                HeightRequest="35"
-                                IsVisible="{Binding IsMeasurementPoint}"/>
-                    </Grid>
-                </DataTemplate>
-            </CollectionView.ItemTemplate>
-        </CollectionView>
+                            <!-- Информация о точке с жестом для раскрытия -->
+                            <StackLayout Grid.Column="2" 
+                                         Spacing="4" 
+                                         VerticalOptions="Center"
+                                         Margin="10,0">
+                                <StackLayout.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding BindingContext.ToggleNodeCommand, Source={RelativeSource AncestorType={x:Type ContentPage}}}"
+                                                          CommandParameter="{Binding .}"
+                                                          NumberOfTapsRequired="1"/>
+                                </StackLayout.GestureRecognizers>
+                                <Label Text="{Binding Name}" 
+                                       Style="{StaticResource NodeHeaderStyle}"/>
+                                <Label Text="{Binding Path}" 
+                                       Style="{StaticResource NodePathStyle}"
+                                       IsVisible="{Binding IsMeasurementPoint}"/>
+                            </StackLayout>
+
+                            <!-- Кнопка добавления замера -->
+                            <Button Grid.Column="3" 
+                                    Text="📊 ЗАМЕР" 
+                                    Command="{Binding BindingContext.AddMeasurementCommand, Source={RelativeSource AncestorType={x:Type ContentPage}}}"
+                                    CommandParameter="{Binding .}"
+                                    Style="{StaticResource MeasurementButtonStyle}"
+                                    IsVisible="{Binding IsMeasurementPoint}"/>
+
+                            <!-- Кнопка раскрытия для узлов с детьми -->
+                            <Button Grid.Column="3"
+                                    Text="{Binding IsExpanded, Converter={StaticResource ExpandedToIconConverter}}"
+                                    Command="{Binding BindingContext.ToggleNodeCommand, Source={RelativeSource AncestorType={x:Type ContentPage}}}"
+                                    CommandParameter="{Binding .}"
+                                    Style="{StaticResource ExpandButtonStyle}"
+                                    IsVisible="{Binding HasChildren}"
+                                    VerticalOptions="Center"
+                                    HorizontalOptions="Center"/>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </RefreshView>
+
+        <!-- Статус бар -->
+        <Frame Grid.Row="2"
+               BackgroundColor="{Binding StatusColor}"
+               Padding="15,10"
+               CornerRadius="0"
+               IsVisible="{Binding HasStatusMessage}">
+            <Label Text="{Binding StatusMessage}" 
+                   FontSize="14"
+                   TextColor="White"
+                   HorizontalTextAlignment="Center"
+                   VerticalTextAlignment="Center"/>
+        </Frame>
     </Grid>
 </ContentPage>

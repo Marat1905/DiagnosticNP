@@ -175,7 +175,7 @@ namespace DiagnosticNP.Services
             var electricMotor = new ControlPoint { Id = id++, Name = "Электродвигатель", Level = 1, ParentId = dryingGroup1.Id, ParentPath = dryingGroup1.FullPath, FullPath = "1 Сушильная группа/Электродвигатель" };
             points.Add(electricMotor);
 
-            // Подшипники электродвигателя (можно добавить аналогично редуктору)
+            // Подшипники электродвигателя
             var frontBearingMotor = new ControlPoint { Id = id++, Name = "Передний подшипник", Level = 2, ParentId = electricMotor.Id, ParentPath = electricMotor.FullPath, FullPath = "1 Сушильная группа/Электродвигатель/Передний подшипник" };
             points.Add(frontBearingMotor);
 
@@ -222,7 +222,11 @@ namespace DiagnosticNP.Services
             points.Add(new ControlPoint { Id = id++, Name = "Горизонтальная вибрация", Level = 4, ParentId = driveBearing1Top2.Id, ParentPath = driveBearing1Top2.FullPath, FullPath = "2 Сушильная группа/Верхняя сетка/1 Сушильный цилиндр/Приводной подшипник/Горизонтальная вибрация", IsMeasurementPoint = true });
             points.Add(new ControlPoint { Id = id++, Name = "Осевая вибрация", Level = 4, ParentId = driveBearing1Top2.Id, ParentPath = driveBearing1Top2.FullPath, FullPath = "2 Сушильная группа/Верхняя сетка/1 Сушильный цилиндр/Приводной подшипник/Осевая вибрация", IsMeasurementPoint = true });
 
-            // Добавьте остальные элементы для 2 Сушильной группы по аналогии с первой...
+            // Инициализация поисковых ключевых слов для всех точек
+            foreach (var point in points)
+            {
+                point.InitializeSearchKeywords();
+            }
 
             return points;
         }

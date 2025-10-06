@@ -5,23 +5,30 @@
              x:Class="DiagnosticNP.App">
     <Application.Resources>
         <ResourceDictionary>
-            <Color x:Key="PrimaryColor">#2196F3</Color>
-            <Color x:Key="SecondaryColor">#FF9800</Color>
-            <Color x:Key="SuccessColor">#4CAF50</Color>
-            <Color x:Key="DangerColor">#F44336</Color>
+            <Color x:Key="PrimaryColor">#3498DB</Color>
+            <Color x:Key="SecondaryColor">#2C3E50</Color>
+            <Color x:Key="SuccessColor">#27AE60</Color>
+            <Color x:Key="WarningColor">#E67E22</Color>
+            <Color x:Key="DangerColor">#E74C3C</Color>
+            <Color x:Key="LightColor">#ECF0F1</Color>
+            <Color x:Key="DarkColor">#2C3E50</Color>
 
             <!-- Конвертеры -->
             <converters:LevelToWidthConverter x:Key="LevelToWidthConverter"/>
             <converters:ExpandedToIconConverter x:Key="ExpandedToIconConverter"/>
             <converters:BoolToBoldConverter x:Key="BoolToBoldConverter"/>
+            <converters:LevelToColorConverter x:Key="LevelToColorConverter"/>
+            <converters:NodeTypeToColorConverter x:Key="NodeTypeToColorConverter"/>
+            <converters:NodeTypeToIconConverter x:Key="NodeTypeToIconConverter"/>
+            <converters:BoolToOpacityConverter x:Key="BoolToOpacityConverter"/>
 
             <Style TargetType="Label">
                 <Setter Property="FontSize" Value="14" />
-                <Setter Property="TextColor" Value="#212121" />
+                <Setter Property="TextColor" Value="#2C3E50" />
             </Style>
             <Style TargetType="Button">
                 <Setter Property="FontSize" Value="14" />
-                <Setter Property="CornerRadius" Value="5" />
+                <Setter Property="CornerRadius" Value="8" />
                 <Setter Property="HeightRequest" Value="45" />
             </Style>
             <Style x:Key="PrimaryButton" TargetType="Button">
