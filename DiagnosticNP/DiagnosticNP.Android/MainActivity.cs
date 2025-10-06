@@ -1,10 +1,12 @@
-﻿using System;
-
+﻿using Android;
 using Android.App;
-using Android.Content.PM;
-using Android.Runtime;
-using Android.OS;
 using Android.Content;
+using Android.Content.PM;
+using Android.OS;
+using Android.Runtime;
+using DiagnosticNP.Services.Bluetooth;
+using System;
+using System.Collections.Generic;
 
 namespace DiagnosticNP.Droid
 {
@@ -23,10 +25,36 @@ namespace DiagnosticNP.Droid
             // Явная инициализация NFC
             Plugin.NFC.CrossNFC.Init(this);
 
+            if (Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.M)
+                ProcessPermissions();
+
             LoadApplication(new App());
 
             // Обработка NFC интента при запуске
             ProcessNFCIntent(Intent);
+        }
+
+        private static int PERMISSION_REQUEST = 10567;
+
+        private string[] permissions =
+              {
+            Manifest.Permission.AccessCoarseLocation,
+            Manifest.Permission.Bluetooth,
+            Manifest.Permission.BluetoothAdmin,
+            Manifest.Permission.BluetoothPrivileged
+                };
+
+        private void ProcessPermissions()
+        {
+            var ungranted = new List<string>();
+            foreach (var p in permissions)
+                if (CheckSelfPermission(p) != Permission.Granted)
+                    ungranted.Add(p);
+
+            if (ungranted.Count > 0)
+            {
+                RequestPermissions(ungranted.ToArray(), PERMISSION_REQUEST);
+            }
         }
 
         protected override void OnNewIntent(Intent intent)
@@ -51,9 +79,17 @@ namespace DiagnosticNP.Droid
         }
         public override void OnRequestPermissionsResult(int requestCode, string[] permissions, [GeneratedEnum] Android.Content.PM.Permission[] grantResults)
         {
-            Xamarin.Essentials.Platform.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+            try
+            {
+                if (requestCode == PERMISSION_REQUEST)
+                {
+                    BluetoothController.Restart();
+                }
+            }
+            catch { return; }
+            //Xamarin.Essentials.Platform.OnRequestPermissionsResult(requestCode, permissions, grantResults);
 
-            base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+            //base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
         }
 
         private void ProcessNFCIntent(Intent intent)

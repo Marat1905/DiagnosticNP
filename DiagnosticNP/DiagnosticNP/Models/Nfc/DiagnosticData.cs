@@ -1,7 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
 
-namespace DiagnosticNP.Models
+namespace DiagnosticNP.Models.Nfc
 {
     public class DiagnosticData : INotifyPropertyChanged
     {

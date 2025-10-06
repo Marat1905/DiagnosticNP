@@ -3,7 +3,7 @@ using System;
 using System.Threading.Tasks;
 using Xamarin.Forms;
 
-namespace DiagnosticNP.Services
+namespace DiagnosticNP.Services.Nfc
 {
     public interface INfcService
     {
