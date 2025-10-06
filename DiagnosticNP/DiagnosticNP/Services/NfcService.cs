@@ -1,7 +1,6 @@
 ﻿using Plugin.NFC;
 using System;
 using System.Threading.Tasks;
-using Xamarin.Forms;
 
 namespace DiagnosticNP.Services
 {
@@ -148,11 +147,6 @@ namespace DiagnosticNP.Services
                 System.Diagnostics.Debug.WriteLine($"Ошибка обработки тега: {ex.Message}");
             }
             return string.Empty;
-        }
-
-        public void Dispose()
-        {
-            StopListening();
         }
     }
 }

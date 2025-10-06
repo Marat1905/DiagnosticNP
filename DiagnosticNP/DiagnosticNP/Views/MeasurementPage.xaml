@@ -1,0 +1,53 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DiagnosticNP.Views.MeasurementPage"
+             Title="Добавить замер">
+
+    <ScrollView>
+        <StackLayout Padding="20" Spacing="15">
+
+            <!-- Информация о точке -->
+            <Frame BackgroundColor="#E3F2FD" Padding="15" CornerRadius="10">
+                <StackLayout>
+                    <Label Text="{Binding ControlPoint.Name}" FontSize="18" FontAttributes="Bold"/>
+                    <Label Text="{Binding ControlPoint.Path}" FontSize="12" TextColor="Gray"/>
+                </StackLayout>
+            </Frame>
+
+            <!-- Форма ввода данных -->
+            <Frame BackgroundColor="White" Padding="15" CornerRadius="10" HasShadow="True">
+                <StackLayout Spacing="10">
+
+                    <Label Text="Скорость вибрации (мм/с):" FontAttributes="Bold"/>
+                    <Entry Text="{Binding VibrationSpeed}" Keyboard="Numeric" Placeholder="0.0"/>
+
+                    <Label Text="Температура (°C):" FontAttributes="Bold" Margin="0,10,0,0"/>
+                    <Entry Text="{Binding Temperature}" Keyboard="Numeric" Placeholder="0.0"/>
+
+                    <Label Text="Ускорение (м/с²):" FontAttributes="Bold" Margin="0,10,0,0"/>
+                    <Entry Text="{Binding Acceleration}" Keyboard="Numeric" Placeholder="0.0"/>
+
+                    <Label Text="Куртозис:" FontAttributes="Bold" Margin="0,10,0,0"/>
+                    <Entry Text="{Binding Kurtosis}" Keyboard="Numeric" Placeholder="0.0"/>
+
+                    <Label Text="Время замера:" FontAttributes="Bold" Margin="0,10,0,0"/>
+                    <Label Text="{Binding MeasurementTime}" FontSize="14"/>
+
+                </StackLayout>
+            </Frame>
+
+            <!-- Кнопки -->
+            <StackLayout Spacing="10">
+                <Button Text="Сохранить замер" 
+                        Command="{Binding SaveMeasurementCommand}"
+                        Style="{StaticResource SuccessButton}"/>
+
+                <Button Text="Отмена" 
+                        Command="{Binding CancelCommand}"
+                        Style="{StaticResource DangerButton}"/>
+            </StackLayout>
+
+        </StackLayout>
+    </ScrollView>
+</ContentPage>

@@ -1,4 +1,5 @@
-﻿using DiagnosticNP.Views;
+﻿using DiagnosticNP.Services;
+using DiagnosticNP.Views;
 using Xamarin.Forms;
 
 namespace DiagnosticNP
@@ -9,7 +10,10 @@ namespace DiagnosticNP
         {
             InitializeComponent();
 
-            MainPage = new MainPage();
+            // Инициализация базы данных
+            DatabaseService.Init();
+
+            MainPage = new NavigationPage(new MainPage());
         }
 
         protected override void OnStart()

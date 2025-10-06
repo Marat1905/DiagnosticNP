@@ -1,0 +1,77 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DiagnosticNP.Views.ControlPointsPage"
+             Title="Контрольные точки">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Поиск и фильтры -->
+        <StackLayout Grid.Row="0" Padding="10" BackgroundColor="#F5F5F5">
+            <Label Text="Фильтр по NFC:" FontAttributes="Bold"/>
+            <Label Text="{Binding FilterInfo}" FontSize="12" TextColor="Gray"/>
+            <Button Text="Сбросить фильтр" 
+                    Command="{Binding ResetFilterCommand}"
+                    Style="{StaticResource PrimaryButton}"
+                    Margin="0,5,0,0"/>
+        </StackLayout>
+
+        <!-- Дерево контрольных точек -->
+        <CollectionView Grid.Row="1" ItemsSource="{Binding DisplayNodes}">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Padding="10,5" BackgroundColor="Transparent">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="{Binding Level, Converter={StaticResource LevelToWidthConverter}}"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Отступ для уровня вложенности -->
+                        <BoxView Grid.Column="0" BackgroundColor="Transparent"/>
+
+                        <!-- Кнопка раскрытия/скрытия -->
+                        <Label Grid.Column="1" 
+                               Text="{Binding IsExpanded, Converter={StaticResource ExpandedToIconConverter}}"
+                               FontSize="16"
+                               VerticalOptions="Center"
+                               HorizontalOptions="Center"
+                               WidthRequest="30"
+                               IsVisible="{Binding HasChildren}">
+                            <Label.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding BindingContext.ToggleNodeCommand, Source={RelativeSource AncestorType={x:Type ContentPage}}}" 
+                                                      CommandParameter="{Binding .}"/>
+                            </Label.GestureRecognizers>
+                        </Label>
+
+                        <!-- Информация о точке -->
+                        <StackLayout Grid.Column="2" Spacing="2" VerticalOptions="Center">
+                            <Label Text="{Binding Name}" 
+                                   FontSize="16" 
+                                   FontAttributes="{Binding IsMeasurementPoint, Converter={StaticResource BoolToBoldConverter}}"/>
+                            <Label Text="{Binding Path}" 
+                                   FontSize="12" 
+                                   TextColor="Gray"
+                                   IsVisible="{Binding IsMeasurementPoint}"/>
+                        </StackLayout>
+
+                        <!-- Кнопка добавления замера -->
+                        <Button Grid.Column="3" 
+                                Text="Добавить замер" 
+                                Command="{Binding BindingContext.AddMeasurementCommand, Source={RelativeSource AncestorType={x:Type ContentPage}}}"
+                                CommandParameter="{Binding .}"
+                                Style="{StaticResource SuccessButton}"
+                                FontSize="12"
+                                HeightRequest="35"
+                                IsVisible="{Binding IsMeasurementPoint}"/>
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>

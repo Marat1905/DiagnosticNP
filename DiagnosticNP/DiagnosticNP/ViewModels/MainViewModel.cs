@@ -1,5 +1,6 @@
 ﻿using DiagnosticNP.Models;
 using DiagnosticNP.Services;
+using DiagnosticNP.Views;
 using System;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -10,17 +11,24 @@ namespace DiagnosticNP.ViewModels
     public class MainViewModel : BaseViewModel
     {
         private readonly INfcService _nfcService;
+        private readonly IApiService _apiService;
+        private readonly IDatabaseService _databaseService;
+
         private DiagnosticData _diagnosticData;
-        private bool _isListening;
+        private string _nfcStatusText;
+        private Color _nfcStatusColor;
 
         public MainViewModel()
         {
             _nfcService = new NfcService();
+            _apiService = new ApiService();
+            _databaseService = new DatabaseService();
+
             _diagnosticData = new DiagnosticData();
-            _nfcService.TagScanned += OnTagScanned;
+            _nfcStatusText = "NFC не инициализирован";
+            _nfcStatusColor = Color.Gray;
 
             InitializeCommands();
-            InitializeNfc();
         }
 
         public DiagnosticData DiagnosticData
@@ -29,21 +37,34 @@ namespace DiagnosticNP.ViewModels
             set => SetProperty(ref _diagnosticData, value);
         }
 
-        public bool IsListening
+        public string NfcStatusText
         {
-            get => _isListening;
-            set => SetProperty(ref _isListening, value);
+            get => _nfcStatusText;
+            set => SetProperty(ref _nfcStatusText, value);
         }
 
-        public ICommand StartListeningCommand { get; private set; }
-        public ICommand StopListeningCommand { get; private set; }
-        public ICommand ReadTagCommand { get; private set; }
+        public Color NfcStatusColor
+        {
+            get => _nfcStatusColor;
+            set => SetProperty(ref _nfcStatusColor, value);
+        }
+
+        public ICommand LoadControlPointsCommand { get; private set; }
+        public ICommand ShowControlPointsTreeCommand { get; private set; }
+        public ICommand UploadDataCommand { get; private set; }
+        public ICommand ClearMeasurementsCommand { get; private set; }
 
         private void InitializeCommands()
         {
-            StartListeningCommand = new Command(async () => await StartListening());
-            StopListeningCommand = new Command(StopListening);
-            ReadTagCommand = new Command(async () => await ReadTag());
+            LoadControlPointsCommand = new Command(async () => await LoadControlPoints());
+            ShowControlPointsTreeCommand = new Command(async () => await ShowControlPointsTree());
+            UploadDataCommand = new Command(async () => await UploadData());
+            ClearMeasurementsCommand = new Command(async () => await ClearMeasurements());
+        }
+
+        public void OnAppearing()
+        {
+            InitializeNfc();
         }
 
         private async void InitializeNfc()
@@ -53,88 +74,123 @@ namespace DiagnosticNP.ViewModels
                 var isAvailable = await _nfcService.IsAvailableAsync();
                 if (!isAvailable)
                 {
-                    await Application.Current.MainPage.DisplayAlert("Информация",
-                        "NFC не поддерживается на этом устройстве", "OK");
-                }
-            }
-            catch (Exception ex)
-            {
-                await Application.Current.MainPage.DisplayAlert("Ошибка",
-                    $"Ошибка инициализации NFC: {ex.Message}", "OK");
-            }
-        }
-
-        private async Task StartListening()
-        {
-            try
-            {
-                if (!await _nfcService.IsEnabledAsync())
-                {
-                    await Application.Current.MainPage.DisplayAlert("Ошибка",
-                        "NFC отключен. Включите NFC в настройках устройства.", "OK");
+                    NfcStatusText = "NFC не поддерживается";
+                    NfcStatusColor = Color.Red;
                     return;
                 }
 
+                var isEnabled = await _nfcService.IsEnabledAsync();
+                if (!isEnabled)
+                {
+                    NfcStatusText = "NFC отключен";
+                    NfcStatusColor = Color.Orange;
+                    return;
+                }
+
+                _nfcService.TagScanned += OnTagScanned;
                 _nfcService.StartListening();
-                IsListening = true;
 
-                await Application.Current.MainPage.DisplayAlert("Успех",
-                    "Сканирование NFC запущено. Поднесите метку к устройству.", "OK");
+                NfcStatusText = "Сканирование NFC активно";
+                NfcStatusColor = Color.Green;
             }
             catch (Exception ex)
             {
-                await Application.Current.MainPage.DisplayAlert("Ошибка",
-                    $"Ошибка запуска сканирования: {ex.Message}", "OK");
+                NfcStatusText = $"Ошибка NFC: {ex.Message}";
+                NfcStatusColor = Color.Red;
             }
         }
 
-        private void StopListening()
+        private async Task LoadControlPoints()
         {
+            if (IsBusy) return;
+
+            IsBusy = true;
+            StatusMessage = "Загрузка контрольных точек...";
+            StatusColor = Color.Blue;
+
             try
             {
-                _nfcService.StopListening();
-                IsListening = false;
+                var controlPoints = await _apiService.GetControlPointsAsync();
 
-                Application.Current.MainPage.DisplayAlert("Успех",
-                    "Сканирование NFC остановлено", "OK");
-            }
-            catch (Exception ex)
-            {
-                Application.Current.MainPage.DisplayAlert("Ошибка",
-                    $"Ошибка остановки сканирования: {ex.Message}", "OK");
-            }
-        }
-
-        private async Task ReadTag()
-        {
-            try
-            {
-                if (!await _nfcService.IsEnabledAsync())
+                if (controlPoints != null && controlPoints.Count > 0)
                 {
-                    await Application.Current.MainPage.DisplayAlert("Ошибка",
-                        "NFC отключен", "OK");
-                    return;
-                }
-
-                var tagData = await _nfcService.ReadTagAsync();
-                if (!string.IsNullOrEmpty(tagData))
-                {
-                    DiagnosticData.NFCData = tagData;
-                    DiagnosticData.ScanTime = DateTime.Now;
-
-                    await Application.Current.MainPage.DisplayAlert("Успех",
-                        $"Метка прочитана: {tagData}", "OK");
+                    await _databaseService.SaveControlPointsAsync(controlPoints);
+                    StatusMessage = $"Загружено {controlPoints.Count} контрольных точек";
+                    StatusColor = Color.Green;
                 }
                 else
                 {
-                    await Application.Current.MainPage.DisplayAlert("Информация",
-                        "Не удалось прочитать метку или метка пуста", "OK");
+                    StatusMessage = "Не удалось загрузить контрольные точки";
+                    StatusColor = Color.Red;
                 }
             }
             catch (Exception ex)
             {
-                await Application.Current.MainPage.DisplayAlert("Ошибка",
-                    $"Ошибка чтения метки: {ex.Message}", "OK");
+                StatusMessage = $"Ошибка загрузки: {ex.Message}";
+                StatusColor = Color.Red;
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
+        private async Task ShowControlPointsTree()
+        {
+            var page = new ControlPointsPage
+            {
+                BindingContext = new ControlPointsViewModel(_databaseService, DiagnosticData.NFCData)
+            };
+            await Application.Current.MainPage.Navigation.PushAsync(page);
+        }
+
+        private async Task UploadData()
+        {
+            if (IsBusy) return;
+
+            IsBusy = true;
+            StatusMessage = "Выгрузка данных на сервер...";
+            StatusColor = Color.Blue;
+
+            try
+            {
+                var measurements = await _databaseService.GetAllMeasurementsAsync();
+                var success = await _apiService.UploadMeasurementsAsync(measurements);
+
+                if (success)
+                {
+                    StatusMessage = $"Успешно выгружено {measurements.Count} замеров";
+                    StatusColor = Color.Green;
+                }
+                else
+                {
+                    StatusMessage = "Ошибка выгрузки данных";
+                    StatusColor = Color.Red;
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Ошибка выгрузки: {ex.Message}";
+                StatusColor = Color.Red;
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
+        private async Task ClearMeasurements()
+        {
+            var result = await Application.Current.MainPage.DisplayAlert(
+                "Подтверждение",
+                "Вы уверены, что хотите очистить все данные замеров?",
+                "Да", "Нет");
+
+            if (result)
+            {
+                await _databaseService.ClearMeasurementsAsync();
+                StatusMessage = "Данные замеров очищены";
+                StatusColor = Color.Green;
             }
         }
 
@@ -145,14 +201,13 @@ namespace DiagnosticNP.ViewModels
                 DiagnosticData.NFCData = nfcData;
                 DiagnosticData.ScanTime = DateTime.Now;
 
-                Application.Current.MainPage.DisplayAlert("Успех",
-                    $"Метка просканирована: {nfcData}", "OK");
+                // Автоматически показываем дерево контрольных точек при сканировании NFC
+                Device.BeginInvokeOnMainThread(async () =>
+                {
+                    await ShowAlert("NFC Метка", $"Метка просканирована: {nfcData}", "OK");
+                    await ShowControlPointsTree();
+                });
             });
         }
-
-        //public void Dispose()
-        //{
-        //    _nfcService?.Dispose();
-        //}
     }
 }

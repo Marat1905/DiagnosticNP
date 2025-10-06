@@ -1,22 +1,23 @@
 ﻿using DiagnosticNP.ViewModels;
 using Xamarin.Forms;
+using Xamarin.Forms.Xaml;
 
 namespace DiagnosticNP.Views
 {
-    public partial class MainPage : ContentPage
+    [XamlCompilation(XamlCompilationOptions.Compile)]
+    public partial class ControlPointsPage : ContentPage
     {
-        public MainPage()
+        public ControlPointsPage()
         {
             InitializeComponent();
-            BindingContext = new MainViewModel();
         }
 
         protected override void OnAppearing()
         {
             base.OnAppearing();
-            if (BindingContext is MainViewModel vm)
+            if (BindingContext is ControlPointsViewModel vm)
             {
-                vm.OnAppearing();
+                vm.LoadData();
             }
         }
     }
