@@ -336,16 +336,30 @@ namespace DiagnosticNP.Droid.Bluetooth
             base.OnMtuChanged(gatt, mtu, status);
         }
 
-        private static bool WaitFor(TimeSpan interval, Func<bool> exit)
+        // Заменяем блокирующий WaitFor на асинхронный
+        private static async Task<bool> WaitForAsync(TimeSpan interval, Func<bool> exit)
         {
-            for (int i = 0; i < interval.TotalMilliseconds; i++)
+            var startTime = DateTime.Now;
+            while (DateTime.Now - startTime < interval)
             {
                 if (exit.Invoke())
                     return true;
-                Thread.Sleep(1);
+                await Task.Delay(10); // Вместо Thread.Sleep(1)
             }
-
             return false;
+        }
+
+        // Сохраняем старый метод для совместимости, но используем асинхронный внутри
+        private static bool WaitFor(TimeSpan interval, Func<bool> exit)
+        {
+            try
+            {
+                return Task.Run(() => WaitForAsync(interval, exit)).GetAwaiter().GetResult();
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         protected override void Dispose(bool disposing)

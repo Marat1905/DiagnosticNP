@@ -22,6 +22,8 @@ namespace DiagnosticNP.Droid.Bluetooth
 {
     public class VPenControl : IVPenControl
     {
+        private string _currentDeviceAddress;
+
         private static BluetoothAdapter GetAdapter()
         {
             BluetoothAdapter adapter = BluetoothAdapter.DefaultAdapter;
@@ -67,12 +69,18 @@ namespace DiagnosticNP.Droid.Bluetooth
         {
             try
             {
+                // Если уже подключены к тому же устройству, возвращаем true
+                if (IsConnected && _currentDeviceAddress == connection)
+                    return true;
+
                 await Disconnect();
                 Dispose();
 
                 if (Gatt == null)
                     Gatt = new GATTConetionTools();
+
                 var device = await Task.Run(() => FindBluetoothDevice(connection));
+
                 for (int i = 0; i < 4; i++)
                 {
                     try
@@ -82,6 +90,7 @@ namespace DiagnosticNP.Droid.Bluetooth
                     }
                     catch { continue; }
                 }
+
                 LongFrame = false;
                 if ((await Gatt.ChangeMtuAsync(TimeSpan.FromSeconds(5), 512)) > 100)
                     LongFrame = true;
@@ -92,10 +101,12 @@ namespace DiagnosticNP.Droid.Bluetooth
                 if (IsConnected)
                     Gatt.Gatt.RequestConnectionPriority(GattConnectionPriority.High);
 
+                _currentDeviceAddress = connection;
                 return IsConnected;
             }
             catch
             {
+                _currentDeviceAddress = null;
                 return false;
             }
         }
@@ -104,10 +115,19 @@ namespace DiagnosticNP.Droid.Bluetooth
         {
             try
             {
-                await Gatt?.DisconnectGattAsync(TimeSpan.FromSeconds(5));
-                Gatt?.Gatt?.Close();
+                if (Gatt != null)
+                {
+                    await Gatt.DisconnectGattAsync(TimeSpan.FromSeconds(5));
+                    Gatt.Gatt?.Close();
+                    Gatt.Dispose();
+                    Gatt = null;
+                }
+                _currentDeviceAddress = null;
             }
-            catch { return; }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка при отключении: {ex.Message}");
+            }
         }
 
         public void Dispose()
@@ -120,6 +140,7 @@ namespace DiagnosticNP.Droid.Bluetooth
             finally
             {
                 Gatt = null;
+                _currentDeviceAddress = null;
             }
         }
 
