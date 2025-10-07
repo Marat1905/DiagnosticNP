@@ -69,20 +69,24 @@ namespace DiagnosticNP.Droid.Bluetooth
                         Gatt = device.ConnectGatt(Application.Context, autoConnect, this, BluetoothTransports.Le);
                         if (!autoConnect)
                             Gatt.Connect();
-                        WaitFor(timeout, () => IsGattConnected);
                     }
                     else
                     {
                         Gatt = device.ConnectGatt(Application.Context, false, this);
                         Gatt.Connect();
-                        WaitFor(timeout, () => IsGattConnected);
                     }
 
+                    // Быстрое ожидание подключения
+                    var startTime = DateTime.Now;
+                    while (!IsGattConnected && (DateTime.Now - startTime) < timeout)
+                    {
+                        Thread.Sleep(50);
+                    }
 
                     if (!IsGattConnected)
                     {
-                        Gatt.Disconnect();
-                        Gatt.Dispose();
+                        Gatt?.Disconnect();
+                        Gatt?.Dispose();
                         Gatt = null;
                     }
 
@@ -91,7 +95,7 @@ namespace DiagnosticNP.Droid.Bluetooth
             }
             catch (Exception exc)
             {
-                Console.WriteLine(exc.Message);
+                System.Diagnostics.Debug.WriteLine($"Ошибка быстрого подключения GATT: {exc.Message}");
                 return false;
             }
         }
@@ -104,13 +108,26 @@ namespace DiagnosticNP.Droid.Bluetooth
 
             IsGattDisconnected = false;
 
-            return await Task.Run(() =>
+            return await Task.Run(async () =>
             {
-                Gatt.Disconnect();
+                try
+                {
+                    Gatt.Disconnect();
 
-                WaitFor(timeout, () => IsGattDisconnected);
+                    // Асинхронное ожидание отключения
+                    var startTime = DateTime.Now;
+                    while (!IsGattDisconnected && (DateTime.Now - startTime) < timeout)
+                    {
+                        await Task.Delay(50);
+                    }
 
-                return IsGattConnected;
+                    return IsGattDisconnected;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Ошибка в DisconnectGattAsync: {ex.Message}");
+                    return false;
+                }
             });
         }
 
@@ -141,13 +158,22 @@ namespace DiagnosticNP.Droid.Bluetooth
 
         public async Task<bool> DiscoverServicesAsync(TimeSpan timeout)
         {
-            if (this.Gatt == null) throw new Exception("GATT is not connected!");
+            if (this.Gatt == null)
+                throw new Exception("GATT is not connected!");
+
             IsServicesDiscovered = false;
 
             return await Task.Run(() =>
             {
                 Gatt.DiscoverServices();
-                WaitFor(timeout, () => IsServicesDiscovered);
+
+                // Быстрое ожидание с короткими проверками
+                var startTime = DateTime.Now;
+                while (!IsServicesDiscovered && (DateTime.Now - startTime) < timeout)
+                {
+                    Thread.Sleep(50); // Короткие паузы для быстрой реакции
+                }
+
                 return IsServicesDiscovered;
             });
         }
@@ -368,18 +394,34 @@ namespace DiagnosticNP.Droid.Bluetooth
             {
                 try
                 {
-                    Gatt?.Dispose();
+                    // Последовательное освобождение ресурсов
                     ReadStream?.Dispose();
-                }
-                catch { return; }
-                finally
-                {
-                    this.Device = null;
-                    this.Gatt = null;
+                    ReadStream = null;
+
+                    if (Gatt != null)
+                    {
+                        try
+                        {
+                            Gatt.Disconnect();
+                            Gatt.Close();
+                        }
+                        catch { /* Игнорируем ошибки при закрытии */ }
+
+                        // Даем время на освобождение ресурсов
+                        Thread.Sleep(100);
+
+                        Gatt.Dispose();
+                        Gatt = null;
+                    }
+
+                    Device = null;
                     ReadUUID = null;
                     WriteUUID = null;
-                    ReadStream = null;
                     CommonReadUUID = null;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Ошибка при Dispose GATT: {ex.Message}");
                 }
             }
 

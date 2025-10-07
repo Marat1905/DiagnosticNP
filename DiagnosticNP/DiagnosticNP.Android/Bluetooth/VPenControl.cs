@@ -23,6 +23,9 @@ namespace DiagnosticNP.Droid.Bluetooth
     public class VPenControl : IVPenControl
     {
         private string _currentDeviceAddress;
+        private bool _isDisposing = false;
+        private readonly SemaphoreSlim _connectionLock = new SemaphoreSlim(1, 1);
+        private bool _isConnecting = false;
 
         private static BluetoothAdapter GetAdapter()
         {
@@ -67,58 +70,121 @@ namespace DiagnosticNP.Droid.Bluetooth
 
         public async Task<bool> ConnectAsync(string connection, OperationToken token)
         {
+            if (_isConnecting)
+                return false;
+
+            _isConnecting = true;
+            await _connectionLock.WaitAsync();
+
             try
             {
+                if (_isDisposing) return false;
+
                 // Если уже подключены к тому же устройству, возвращаем true
                 if (IsConnected && _currentDeviceAddress == connection)
                     return true;
 
-                await Disconnect();
-                Dispose();
+                await QuickDisconnect();
 
                 if (Gatt == null)
                     Gatt = new GATTConetionTools();
 
                 var device = await Task.Run(() => FindBluetoothDevice(connection));
 
-                for (int i = 0; i < 4; i++)
+                System.Diagnostics.Debug.WriteLine("Подключение к виброметру...");
+
+                // Подключение с повторными попытками
+                bool connectSuccess = false;
+                for (int i = 0; i < 2; i++)
                 {
                     try
                     {
-                        if (await Gatt.ConnectGattAsync(device, TimeSpan.FromSeconds(10), false))
+                        if (await Gatt.ConnectGattAsync(device, TimeSpan.FromSeconds(8), false))
+                        {
+                            connectSuccess = true;
                             break;
+                        }
                     }
-                    catch { continue; }
+                    catch
+                    {
+                        if (i == 1) throw;
+                        await Task.Delay(500);
+                    }
                 }
 
-                LongFrame = false;
-                if ((await Gatt.ChangeMtuAsync(TimeSpan.FromSeconds(5), 512)) > 100)
-                    LongFrame = true;
+                if (!connectSuccess)
+                {
+                    System.Diagnostics.Debug.WriteLine("Не удалось установить соединение GATT");
+                    return false;
+                }
 
-                if (!await Gatt.DiscoverServicesAsync(TimeSpan.FromSeconds(10)))
-                    throw new Exception("Cant discover services!");
+                // Обнаружение сервисов
+                if (!await Gatt.DiscoverServicesAsync(TimeSpan.FromSeconds(5)))
+                {
+                    System.Diagnostics.Debug.WriteLine("Не удалось обнаружить сервисы");
+                    await QuickDisconnect();
+                    return false;
+                }
+
+                // Проверяем, что нужный сервис доступен
+                var service = Gatt.Gatt.GetService(SERVICE);
+                if (service == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("Требуемый сервис не найден");
+                    await QuickDisconnect();
+                    return false;
+                }
+
+                // Опционально: изменение MTU
+                try
+                {
+                    LongFrame = false;
+                    if ((await Gatt.ChangeMtuAsync(TimeSpan.FromSeconds(3), 512)) > 100)
+                        LongFrame = true;
+                }
+                catch
+                {
+                    System.Diagnostics.Debug.WriteLine("MTU change failed, continuing with default");
+                }
 
                 if (IsConnected)
-                    Gatt.Gatt.RequestConnectionPriority(GattConnectionPriority.High);
+                {
+                    try
+                    {
+                        Gatt.Gatt.RequestConnectionPriority(GattConnectionPriority.High);
+                    }
+                    catch (Exception priEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Connection priority change failed: {priEx.Message}");
+                    }
+                }
 
                 _currentDeviceAddress = connection;
+                System.Diagnostics.Debug.WriteLine("Подключение успешно установлено");
                 return IsConnected;
             }
-            catch
+            catch (Exception ex)
             {
-                _currentDeviceAddress = null;
+                System.Diagnostics.Debug.WriteLine($"Ошибка подключения: {ex.Message}");
+                await QuickDisconnect();
                 return false;
+            }
+            finally
+            {
+                _isConnecting = false;
+                _connectionLock.Release();
             }
         }
 
-        public async Task Disconnect()
+        private async Task QuickDisconnect()
         {
             try
             {
                 if (Gatt != null)
                 {
-                    await Gatt.DisconnectGattAsync(TimeSpan.FromSeconds(5));
+                    await Gatt.DisconnectGattAsync(TimeSpan.FromSeconds(2));
                     Gatt.Gatt?.Close();
+                    await Task.Delay(100);
                     Gatt.Dispose();
                     Gatt = null;
                 }
@@ -126,19 +192,39 @@ namespace DiagnosticNP.Droid.Bluetooth
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Ошибка при отключении: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Ошибка быстрого отключения: {ex.Message}");
+                Gatt?.Dispose();
+                Gatt = null;
+                _currentDeviceAddress = null;
+            }
+        }
+
+        public async Task Disconnect()
+        {
+            await _connectionLock.WaitAsync();
+            try
+            {
+                await QuickDisconnect();
+            }
+            finally
+            {
+                _connectionLock.Release();
             }
         }
 
         public void Dispose()
         {
+            _isDisposing = true;
             try
             {
+                _connectionLock?.Wait(TimeSpan.FromSeconds(3));
+                QuickDisconnect().Wait(TimeSpan.FromSeconds(3));
                 Gatt?.Dispose();
             }
-            catch { return; }
+            catch { }
             finally
             {
+                _connectionLock?.Dispose();
                 Gatt = null;
                 _currentDeviceAddress = null;
             }
@@ -167,142 +253,234 @@ namespace DiagnosticNP.Droid.Bluetooth
 
         public async Task<bool> StartMeasurementAsync(string connection, OperationToken token)
         {
-            if (!IsConnected)
-                throw new Exception("GATT is not connected!");
-
-            var service = Gatt.Gatt.GetService(SERVICE);
-            if (service == null)
-                throw new Exception("Service discover error!");
-
-            var cControl = service.GetCharacteristic(C_CTRL);
-            if (cControl == null)
-                throw new Exception("Cant find characteristics!");
-
+            await _connectionLock.WaitAsync();
             try
             {
-                if (!await Gatt.Write(BitConverter.GetBytes(ViPen_Command_Start), cControl, TimeSpan.FromSeconds(2), false))
-                    throw new Exception("Characteristics set error!");
+                if (!IsConnected)
+                    throw new Exception("GATT is not connected!");
 
-                var watch = new Stopwatch();
-                watch.Start();
+                var service = Gatt.Gatt.GetService(SERVICE);
+                if (service == null)
+                    throw new Exception("Service discover error!");
 
-                while (watch.ElapsedMilliseconds < 5000)
+                var cControl = service.GetCharacteristic(C_CTRL);
+                if (cControl == null)
+                    throw new Exception("Cant find characteristics!");
+
+                try
                 {
-                    var data = await Gatt.Read(cControl, TimeSpan.FromSeconds(1), false);
-                    var status = BitConverter.ToUInt16(data, 0);
-                    if ((status & ViPen_State_Data) > 0)
-                        return true;
-                }
+                    if (!await Gatt.Write(BitConverter.GetBytes(ViPen_Command_Start), cControl, TimeSpan.FromSeconds(2), false))
+                        throw new Exception("Characteristics set error!");
 
-                return false;
+                    var watch = new Stopwatch();
+                    watch.Start();
+
+                    while (watch.ElapsedMilliseconds < 5000)
+                    {
+                        var data = await Gatt.Read(cControl, TimeSpan.FromSeconds(1), false);
+                        var status = BitConverter.ToUInt16(data, 0);
+                        if ((status & ViPen_State_Data) > 0)
+                            return true;
+                    }
+
+                    return false;
+                }
+                finally
+                {
+                    if (!await Gatt.Write(BitConverter.GetBytes(ViPen_Command_Stop), cControl, TimeSpan.FromSeconds(2), false))
+                        throw new Exception("Characteristics set error!");
+                }
             }
             finally
             {
-                if (!await Gatt.Write(BitConverter.GetBytes(ViPen_Command_Stop), cControl, TimeSpan.FromSeconds(2), false))
-                    throw new Exception("Characteristics set error!");
+                _connectionLock.Release();
             }
         }
 
         public async Task Start(string connection, OperationToken token)
         {
-            if (!IsConnected)
-                throw new Exception("GATT is not connected!");
+            await _connectionLock.WaitAsync();
+            try
+            {
+                if (!IsConnected)
+                    throw new Exception("GATT is not connected!");
 
-            var service = Gatt.Gatt.GetService(SERVICE);
-            if (service == null)
-                throw new Exception("Service discover error!");
+                var service = Gatt.Gatt.GetService(SERVICE);
+                if (service == null)
+                    throw new Exception("Service discover error!");
 
-            var cControl = service.GetCharacteristic(C_CTRL);
-            if (cControl == null)
-                throw new Exception("Cant find characteristics!");
+                var cControl = service.GetCharacteristic(C_CTRL);
+                if (cControl == null)
+                    throw new Exception("Cant find characteristics!");
 
-            if (!await Gatt.Write(BitConverter.GetBytes(ViPen_Command_Start), cControl, TimeSpan.FromSeconds(2), false))
-                throw new Exception("Characteristics set error!");
+                // Проверяем состояние перед отправкой команды
+                try
+                {
+                    var currentState = await Gatt.Read(cControl, TimeSpan.FromSeconds(1), false);
+                    var status = BitConverter.ToUInt16(currentState, 0);
+
+                    // Если устройство уже в нужном состоянии, не отправляем команду повторно
+                    if ((status & ViPen_State_Started) > 0)
+                        return;
+                }
+                catch
+                {
+                    // Игнорируем ошибки чтения состояния, продолжаем отправку команды
+                }
+
+                // Отправляем команду START с повторными попытками
+                for (int i = 0; i < 2; i++)
+                {
+                    try
+                    {
+                        if (await Gatt.Write(BitConverter.GetBytes(ViPen_Command_Start), cControl, TimeSpan.FromSeconds(2), false))
+                        {
+                            System.Diagnostics.Debug.WriteLine("Команда START отправлена успешно");
+                            break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Ошибка отправки START (попытка {i + 1}): {ex.Message}");
+                        if (i == 1) throw;
+                        await Task.Delay(200);
+                    }
+                }
+            }
+            finally
+            {
+                _connectionLock.Release();
+            }
         }
 
         public async Task Stop(string connection, OperationToken token)
         {
-            if (!IsConnected)
-                throw new Exception("GATT is not connected!");
+            await _connectionLock.WaitAsync();
+            try
+            {
+                if (!IsConnected)
+                    return; // Уже отключено
 
-            var service = Gatt.Gatt.GetService(SERVICE);
-            if (service == null)
-                throw new Exception("Service discover error!");
+                var service = Gatt.Gatt.GetService(SERVICE);
+                if (service == null)
+                    return;
 
-            var cControl = service.GetCharacteristic(C_CTRL);
-            if (cControl == null)
-                throw new Exception("Cant find characteristics!");
+                var cControl = service.GetCharacteristic(C_CTRL);
+                if (cControl == null)
+                    return;
 
-            if (!await Gatt.Write(BitConverter.GetBytes(ViPen_Command_Stop), cControl, TimeSpan.FromSeconds(2), false))
-                throw new Exception("Characteristics set error!");
+                // Отправляем команду STOP с повторными попытками
+                for (int i = 0; i < 2; i++)
+                {
+                    try
+                    {
+                        if (await Gatt.Write(BitConverter.GetBytes(ViPen_Command_Stop), cControl, TimeSpan.FromSeconds(1), false))
+                        {
+                            System.Diagnostics.Debug.WriteLine("Команда STOP отправлена успешно");
+                            break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Ошибка отправки STOP (попытка {i + 1}): {ex.Message}");
+                        if (i == 1) throw;
+                        await Task.Delay(200);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка в методе Stop: {ex.Message}");
+                // Не бросаем исключение наружу, чтобы не прерывать процесс остановки
+            }
+            finally
+            {
+                _connectionLock.Release();
+            }
         }
 
         public async Task<stUser_DataViPen> ReadUserData(string connection, OperationToken token)
         {
-            if (!IsConnected)
-                throw new Exception("GATT is not connected!");
+            await _connectionLock.WaitAsync();
+            try
+            {
+                if (!IsConnected)
+                    throw new Exception("GATT is not connected!");
 
-            var service = Gatt.Gatt.GetService(SERVICE);
-            if (service == null)
-                throw new Exception("Service discover error!");
+                var service = Gatt.Gatt.GetService(SERVICE);
+                if (service == null)
+                    throw new Exception("Service discover error!");
 
-            var cReading = service.GetCharacteristic(C_READING);
-            if (cReading == null)
-                throw new Exception("Cant find characteristics!");
+                var cReading = service.GetCharacteristic(C_READING);
+                if (cReading == null)
+                    throw new Exception("Cant find characteristics!");
 
-            var result = await Gatt.Read(cReading, TimeSpan.FromSeconds(3));
-
-            return result.BytesToStruct<stUser_DataViPen>();
+                // Быстрое чтение с коротким таймаутом
+                var result = await Gatt.Read(cReading, TimeSpan.FromSeconds(2), false);
+                return result.BytesToStruct<stUser_DataViPen>();
+            }
+            finally
+            {
+                _connectionLock.Release();
+            }
         }
 
         public async Task<VPenData> Download(string connection, OperationToken token)
         {
-            if (!IsConnected)
-                throw new Exception("GATT is not connected!");
-
-            var service = Gatt.Gatt.GetService(SERVICE);
-            if (service == null)
-                throw new Exception("Service discover error!");
-
-            var cControl = service.GetCharacteristic(C_WAV_CTRL);
-            if (cControl == null)
-                throw new Exception("Cant find characteristics!");
-
-            var cRead = service.GetCharacteristic(C_WAV_READ);
-            if (cRead == null)
-                throw new Exception("Cant find characteristics!");
-
+            await _connectionLock.WaitAsync();
             try
             {
-                const int NUMBER_OF_PARTS = 23;
-                const int BLOCKSIZE = 150;
+                if (!IsConnected)
+                    throw new Exception("GATT is not connected!");
 
-                if (!await Gatt.SubscribeAsync(cRead, true, TimeSpan.FromSeconds(5), true))
-                    throw new Exception("Subscription error!");
+                var service = Gatt.Gatt.GetService(SERVICE);
+                if (service == null)
+                    throw new Exception("Service discover error!");
 
-                var result = new VPenData();
-                var request = new byte[]
-                     {
-                            ViPen_Get_Data_Vel,
-                            0
-                     };
+                var cControl = service.GetCharacteristic(C_WAV_CTRL);
+                if (cControl == null)
+                    throw new Exception("Cant find characteristics!");
 
-                var writeTask = Gatt.Write(request, cControl, TimeSpan.FromSeconds(2), false);
-                var readTask = Gatt.ReadBlockWithNotificationAsync(C_WAV_READ, TimeSpan.FromSeconds(30), token, BLOCKSIZE * NUMBER_OF_PARTS);
-                await Task.WhenAll(writeTask, readTask);
-                if (!writeTask.Result)
-                    throw new Exception("Characteristics set error!");
+                var cRead = service.GetCharacteristic(C_WAV_READ);
+                if (cRead == null)
+                    throw new Exception("Cant find characteristics!");
 
-                if (readTask.Result == null)
-                    throw new Exception("Blocks read error!");
+                try
+                {
+                    const int NUMBER_OF_PARTS = 23;
+                    const int BLOCKSIZE = 150;
 
-                var all = readTask.Result;
-                result.Header = all.BytesToStruct<stVPenData>();
-                return result;
+                    if (!await Gatt.SubscribeAsync(cRead, true, TimeSpan.FromSeconds(5), true))
+                        throw new Exception("Subscription error!");
+
+                    var result = new VPenData();
+                    var request = new byte[]
+                         {
+                                ViPen_Get_Data_Vel,
+                                0
+                         };
+
+                    var writeTask = Gatt.Write(request, cControl, TimeSpan.FromSeconds(2), false);
+                    var readTask = Gatt.ReadBlockWithNotificationAsync(C_WAV_READ, TimeSpan.FromSeconds(30), token, BLOCKSIZE * NUMBER_OF_PARTS);
+                    await Task.WhenAll(writeTask, readTask);
+                    if (!writeTask.Result)
+                        throw new Exception("Characteristics set error!");
+
+                    if (readTask.Result == null)
+                        throw new Exception("Blocks read error!");
+
+                    var all = readTask.Result;
+                    result.Header = all.BytesToStruct<stVPenData>();
+                    return result;
+                }
+                finally
+                {
+                    await Gatt.SubscribeAsync(cRead, false, TimeSpan.FromSeconds(5), true);
+                }
             }
             finally
             {
-                await Gatt.SubscribeAsync(cRead, false, TimeSpan.FromSeconds(5), true);
+                _connectionLock.Release();
             }
         }
     }
