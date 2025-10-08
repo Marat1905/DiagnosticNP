@@ -1,87 +1,423 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
-<ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
+<TabbedPage xmlns="http://xamarin.com/schemas/2014/forms"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:syncfusion="clr-namespace:Syncfusion.XForms.TreeView;assembly=Syncfusion.SfTreeView.XForms"
+             xmlns:converters="clr-namespace:DiagnosticNP.Converters"
              x:Class="DiagnosticNP.Views.MainPage"
-             Title="Вибродиагностика">
+             Title="Вибродиагностика"
+             BarBackgroundColor="#1976D2"
+             BarTextColor="White">
 
-    <ScrollView>
-        <StackLayout Padding="20">
-            <!-- NFC Секция -->
-            <Label Text="Данные NFC метки:" FontAttributes="Bold"/>
-            <Label Text="{Binding DiagnosticData.NFCData}" 
-                   BackgroundColor="LightGray" 
-                   Padding="10"/>
+    <TabbedPage.Resources>
+        <ResourceDictionary>
+            <!-- Базовые конвертеры -->
+            <converters:BoolToColorConverter x:Key="BoolToColorConverter" 
+                                           TrueColor="#4CAF50" 
+                                           FalseColor="#E0E0E0"/>
+            <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+            <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
+            <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
 
-            <Label Text="Время сканирования:" FontAttributes="Bold" Margin="0,10,0,0"/>
-            <Label Text="{Binding DiagnosticData.ScanTime}" 
-                   BackgroundColor="LightGray" 
-                   Padding="10"/>
+            <!-- Конвертеры для TreeView -->
+            <converters:NodeTypeToIconConverter x:Key="NodeTypeToIconConverter"/>
+            <converters:NodeTypeToColorConverter x:Key="NodeTypeToColorConverter"/>
+            <converters:LevelToMarginConverter x:Key="LevelToMarginConverter"/>
+            <converters:SelectedToBackgroundConverter x:Key="SelectedToBackgroundConverter"/>
+            <converters:SelectedToTextColorConverter x:Key="SelectedToTextColorConverter"/>
+        </ResourceDictionary>
+    </TabbedPage.Resources>
 
-            <Button Text="Запуск сканирования NFC" 
-                    Command="{Binding StartListeningCommand}"
-                    BackgroundColor="Green"
-                    TextColor="White"
-                    Margin="0,20,0,0"/>
+    <!-- Вкладка оборудования -->
+    <ContentPage Title="Оборудование">
+        <Grid BackgroundColor="#F5F5F5">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-            <Button Text="Остановка сканирования NFC" 
-                    Command="{Binding StopListeningCommand}"
-                    BackgroundColor="Red"
-                    TextColor="White"
-                    Margin="0,10,0,0"/>
+            <!-- Верхняя панель с кнопками -->
+            <Frame Grid.Row="0" BackgroundColor="White" Padding="12" Margin="8" HasShadow="True" CornerRadius="8">
+                <StackLayout Spacing="8">
+                    <!-- Основные кнопки -->
+                    <Button Text="📥 Загрузить структуру оборудования" 
+                            Command="{Binding LoadEquipmentCommand}"
+                            BackgroundColor="#2196F3"
+                            TextColor="White"
+                            CornerRadius="20"
+                            HeightRequest="45"
+                            FontAttributes="Bold"
+                            FontSize="14"/>
 
-            <Button Text="Прочитать NFC метку" 
-                    Command="{Binding ReadTagCommand}"
-                    BackgroundColor="Blue"
-                    TextColor="White"
-                    Margin="0,10,0,0"/>
+                    <!-- Отладочная информация -->
+                    <Frame BackgroundColor="#E3F2FD" Padding="8" CornerRadius="6" HasShadow="False">
+                        <StackLayout Orientation="Horizontal">
+                            <Label Text="Узлов: " FontSize="12" TextColor="#1976D2"/>
+                            <Label Text="{Binding EquipmentTree.Count}" FontSize="12" TextColor="#1976D2" FontAttributes="Bold"/>
+                            <Label Text=" | Фильтр NFC: " FontSize="12" TextColor="#1976D2" Margin="10,0,0,0"/>
+                            <Label Text="{Binding NfcFilter}" FontSize="12" TextColor="#1976D2" FontAttributes="Bold"/>
+                        </StackLayout>
+                    </Frame>
 
-            <!-- Виброметр Секция -->
-            <Label Text="Данные виброметра:" FontAttributes="Bold" Margin="0,30,0,0"/>
+                    <StackLayout Orientation="Horizontal" Spacing="6">
+                        <Button Text="📤 Выгрузить" 
+                                Command="{Binding UploadMeasurementsCommand}"
+                                BackgroundColor="#4CAF50"
+                                TextColor="White"
+                                CornerRadius="15"
+                                HeightRequest="40"
+                                HorizontalOptions="FillAndExpand"
+                                FontSize="12"/>
+                        <Button Text="🗑️ Очистить" 
+                                Command="{Binding ClearMeasurementsCommand}"
+                                BackgroundColor="#F44336"
+                                TextColor="White"
+                                CornerRadius="15"
+                                HeightRequest="40"
+                                HorizontalOptions="FillAndExpand"
+                                FontSize="12"/>
+                    </StackLayout>
 
-            <Label Text="Последнее обновление:" FontAttributes="Italic"/>
-            <Label Text="{Binding LastAdvertising}" 
-                   BackgroundColor="LightBlue" 
-                   Padding="10"/>
+                    <!-- Переключение представлений -->
+                    <StackLayout Orientation="Horizontal" Spacing="4">
+                        <Button Text="🌳 Полное дерево" 
+                                Command="{Binding ShowFullTreeCommand}"
+                                BackgroundColor="{Binding ShowFilteredView, Converter={StaticResource InverseBooleanConverter}, ConverterParameter='#2196F3|#E0E0E0'}"
+                                TextColor="{Binding ShowFilteredView, Converter={StaticResource InverseBooleanConverter}, ConverterParameter='White|Gray'}"
+                                CornerRadius="12"
+                                HeightRequest="36"
+                                HorizontalOptions="FillAndExpand"
+                                FontSize="11"/>
+                        <Button Text="🔍 По NFC" 
+                                Command="{Binding ShowFilteredTreeCommand}"
+                                BackgroundColor="{Binding ShowFilteredView, Converter={StaticResource BoolToColorConverter}}"
+                                TextColor="{Binding ShowFilteredView, Converter={StaticResource InverseBooleanConverter}, ConverterParameter='Gray|White'}"
+                                CornerRadius="12"
+                                HeightRequest="36"
+                                HorizontalOptions="FillAndExpand"
+                                FontSize="11"/>
+                    </StackLayout>
+                </StackLayout>
+            </Frame>
 
-            <Label Text="Скорость (mm/s):"/>
-            <Label Text="{Binding Velocity}" 
-                   BackgroundColor="LightBlue" 
-                   Padding="10"/>
+            <!-- Древовидная структура -->
+            <Frame Grid.Row="1" BackgroundColor="White" Padding="0" Margin="8" HasShadow="True" CornerRadius="8">
+                <Grid>
+                    <!-- Сообщение о пустом дереве -->
+                    <StackLayout HorizontalOptions="Center" VerticalOptions="Center" 
+                               IsVisible="{Binding EquipmentTree.Count, Converter={StaticResource CountToVisibilityConverter}, ConverterParameter='inverse'}">
+                        <Label Text="📂 Дерево оборудования пусто" 
+                               HorizontalOptions="Center"
+                               FontSize="14"
+                               TextColor="#666666"/>
+                        <Label Text="Нажмите 'Загрузить структуру оборудования'" 
+                               HorizontalOptions="Center"
+                               FontSize="12"
+                               TextColor="#999999"/>
+                    </StackLayout>
 
-            <Label Text="Ускорение (mm/s²):"/>
-            <Label Text="{Binding Acceleration}" 
-                   BackgroundColor="LightBlue" 
-                   Padding="10"/>
+                    <!-- Полное дерево -->
+                    <syncfusion:SfTreeView x:Name="fullTreeView"
+                                          ItemsSource="{Binding EquipmentTree}"
+                                          ChildPropertyName="Children"
+                                          AutoExpandMode="None"
+                                          ItemHeight="42"
+                                          IsVisible="{Binding ShowFilteredView, Converter={StaticResource InverseBooleanConverter}}"
+                                          ItemTapped="OnFullTreeViewItemTapped"
+                                          BackgroundColor="White">
+                        <syncfusion:SfTreeView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid BackgroundColor="{Binding IsSelected, Converter={StaticResource SelectedToBackgroundConverter}}"
+                                      Padding="{Binding Level, Converter={StaticResource LevelToMarginConverter}}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
 
-            <Label Text="Куртозис:"/>
-            <Label Text="{Binding Kurtosis}" 
-                   BackgroundColor="LightBlue" 
-                   Padding="10"/>
+                                    <!-- Иконка типа узла -->
+                                    <Frame Grid.Column="0"
+                                           BackgroundColor="{Binding NodeType, Converter={StaticResource NodeTypeToColorConverter}}"
+                                           Padding="6"
+                                           CornerRadius="6"
+                                           HasShadow="False"
+                                           WidthRequest="32"
+                                           HeightRequest="32"
+                                           VerticalOptions="Center">
+                                        <Label Text="{Binding NodeType, Converter={StaticResource NodeTypeToIconConverter}}"
+                                               VerticalOptions="Center"
+                                               HorizontalOptions="Center"
+                                               FontSize="12"
+                                               TextColor="White"/>
+                                    </Frame>
 
-            <Label Text="Температура (°C):"/>
-            <Label Text="{Binding Temperature}" 
-                   BackgroundColor="LightBlue" 
-                   Padding="10"/>
+                                    <!-- Название узла -->
+                                    <Label Grid.Column="1" 
+                                           Text="{Binding Name}" 
+                                           FontSize="14"
+                                           TextColor="{Binding IsSelected, Converter={StaticResource SelectedToTextColorConverter}}"
+                                           VerticalOptions="Center"
+                                           Margin="8,0,0,0"/>
+                                </Grid>
+                            </DataTemplate>
+                        </syncfusion:SfTreeView.ItemTemplate>
+                    </syncfusion:SfTreeView>
 
-            <Button Text="Подключить виброметр" 
-                    Command="{Binding StartVibrometerCommand}"
-                    BackgroundColor="DarkOrange"
-                    TextColor="White"
-                    Margin="0,20,0,0"/>
+                    <!-- Отфильтрованное дерево -->
+                    <syncfusion:SfTreeView x:Name="filteredTreeView"
+                                          ItemsSource="{Binding FilteredEquipmentTree}"
+                                          ChildPropertyName="Children"
+                                          AutoExpandMode="AllNodesExpanded"
+                                          ItemHeight="45"
+                                          IsVisible="{Binding ShowFilteredView}"
+                                          ItemTapped="OnFilteredTreeViewItemTapped"
+                                          BackgroundColor="White">
+                        <syncfusion:SfTreeView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid BackgroundColor="{Binding IsSelected, Converter={StaticResource SelectedToBackgroundConverter}}"
+                                      Padding="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
 
-            <Button Text="Запуск опроса виброметра" 
-                    Command="{Binding PollVibrometerCommand}"
-                    IsEnabled="{Binding IsNotPollingVibrometer}"
-                    BackgroundColor="DarkGreen"
-                    TextColor="White"
-                    Margin="0,10,0,0"/>
+                                    <!-- Иконка с цветным фоном -->
+                                    <Frame Grid.Column="0"
+                                           BackgroundColor="{Binding NodeType, Converter={StaticResource NodeTypeToColorConverter}}"
+                                           Padding="8"
+                                           CornerRadius="6"
+                                           HasShadow="False"
+                                           WidthRequest="36"
+                                           HeightRequest="36"
+                                           VerticalOptions="Center">
+                                        <Label Text="{Binding NodeType, Converter={StaticResource NodeTypeToIconConverter}}"
+                                               VerticalOptions="Center"
+                                               HorizontalOptions="Center"
+                                               FontSize="14"
+                                               TextColor="White"/>
+                                    </Frame>
 
-            <Button Text="Остановка опроса" 
-                    Command="{Binding StopVibrometerCommand}"
-                    IsEnabled="{Binding IsPollingVibrometer}"
-                    BackgroundColor="DarkRed"
-                    TextColor="White"
-                    Margin="0,10,0,0"/>
-        </StackLayout>
-    </ScrollView>
-</ContentPage>
+                                    <!-- Полный путь -->
+                                    <Label Grid.Column="1" 
+                                           Text="{Binding FullPath}" 
+                                           FontSize="13"
+                                           TextColor="{Binding IsSelected, Converter={StaticResource SelectedToTextColorConverter}}"
+                                           FontAttributes="Bold"
+                                           VerticalOptions="Center"
+                                           Margin="8,0,0,0"
+                                           LineBreakMode="TailTruncation"/>
+                                </Grid>
+                            </DataTemplate>
+                        </syncfusion:SfTreeView.ItemTemplate>
+                    </syncfusion:SfTreeView>
+                </Grid>
+            </Frame>
+
+            <!-- Нижняя панель с выбранным узлом и кнопками -->
+            <Frame Grid.Row="2" BackgroundColor="White" Padding="12" Margin="8" HasShadow="True" CornerRadius="8">
+                <StackLayout Spacing="8">
+                    <!-- Выбранный узел -->
+                    <Frame BackgroundColor="#E8F5E8" 
+                           Padding="12" 
+                           CornerRadius="6"
+                           HasShadow="False"
+                           IsVisible="{Binding SelectedNode, Converter={StaticResource NullToVisibilityConverter}}">
+                        <StackLayout Spacing="4">
+                            <Label Text="✅ Выбранная точка:" 
+                                   FontAttributes="Bold"
+                                   FontSize="12"
+                                   TextColor="#2E7D32"/>
+                            <Label Text="{Binding SelectedNode.Name}" 
+                                   FontSize="14"
+                                   TextColor="#1B5E20"
+                                   FontAttributes="Bold"/>
+                            <Label Text="{Binding SelectedNode.FullPath}" 
+                                   FontSize="11" 
+                                   TextColor="#388E3C"
+                                   LineBreakMode="TailTruncation"/>
+                        </StackLayout>
+                    </Frame>
+
+                    <!-- Кнопки измерения -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Column="0" 
+                                Text="🤖 Авто" 
+                                Command="{Binding TakeMeasurementCommand}"
+                                BackgroundColor="#2196F3"
+                                TextColor="White"
+                                CornerRadius="20"
+                                HeightRequest="45"
+                                FontAttributes="Bold"
+                                FontSize="13"
+                                Margin="0,0,4,0"/>
+
+                        <Button Grid.Column="1" 
+                                Text="✍️ Ручной" 
+                                Command="{Binding ManualMeasurementCommand}"
+                                BackgroundColor="#FF9800"
+                                TextColor="White"
+                                CornerRadius="20"
+                                HeightRequest="45"
+                                FontAttributes="Bold"
+                                FontSize="13"
+                                Margin="4,0,0,0"/>
+                    </Grid>
+                </StackLayout>
+            </Frame>
+        </Grid>
+    </ContentPage>
+
+    <!-- Вкладка виброметра -->
+    <ContentPage Title="Виброметр">
+        <ScrollView>
+            <StackLayout Padding="16" Spacing="12" BackgroundColor="#F5F5F5">
+                <!-- Карточка с данными виброметра -->
+                <Frame BackgroundColor="White" Padding="16" HasShadow="True" CornerRadius="12">
+                    <StackLayout Spacing="10">
+                        <Label Text="📊 Данные виброметра" 
+                               FontAttributes="Bold" 
+                               FontSize="16"
+                               TextColor="#1976D2"
+                               HorizontalOptions="Center"/>
+
+                        <BoxView Color="#E0E0E0" HeightRequest="1" Margin="0,4,0,8"/>
+
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Label Grid.Row="0" Grid.Column="0" 
+                                   Text="🕐 Последнее обновление:" 
+                                   FontAttributes="Italic"
+                                   TextColor="#666666"
+                                   FontSize="12"/>
+                            <Label Grid.Row="0" Grid.Column="1" 
+                                   Text="{Binding LastAdvertising}" 
+                                   FontAttributes="Italic"
+                                   TextColor="#666666"
+                                   FontSize="12"/>
+
+                            <Label Grid.Row="1" Grid.Column="0" 
+                                   Text="📈 Скорость (mm/s):"
+                                   FontSize="14"/>
+                            <Label Grid.Row="1" Grid.Column="1" 
+                                   Text="{Binding Velocity, StringFormat='{0:F2}'}" 
+                                   FontAttributes="Bold"
+                                   FontSize="14"
+                                   TextColor="#1976D2"/>
+
+                            <Label Grid.Row="2" Grid.Column="0" 
+                                   Text="⚡ Ускорение (mm/s²):"
+                                   FontSize="14"/>
+                            <Label Grid.Row="2" Grid.Column="1" 
+                                   Text="{Binding Acceleration, StringFormat='{0:F2}'}" 
+                                   FontAttributes="Bold"
+                                   FontSize="14"
+                                   TextColor="#1976D2"/>
+
+                            <Label Grid.Row="3" Grid.Column="0" 
+                                   Text="📊 Куртозис:"
+                                   FontSize="14"/>
+                            <Label Grid.Row="3" Grid.Column="1" 
+                                   Text="{Binding Kurtosis, StringFormat='{0:F2}'}" 
+                                   FontAttributes="Bold"
+                                   FontSize="14"
+                                   TextColor="#1976D2"/>
+
+                            <Label Grid.Row="4" Grid.Column="0" 
+                                   Text="🌡️ Температура (°C):"
+                                   FontSize="14"/>
+                            <Label Grid.Row="4" Grid.Column="1" 
+                                   Text="{Binding Temperature, StringFormat='{0:F2}'}" 
+                                   FontAttributes="Bold"
+                                   FontSize="14"
+                                   TextColor="#1976D2"/>
+                        </Grid>
+                    </StackLayout>
+                </Frame>
+
+                <!-- Карточка управления виброметром -->
+                <Frame BackgroundColor="White" Padding="16" HasShadow="True" CornerRadius="12">
+                    <StackLayout Spacing="12">
+                        <Label Text="🎛️ Управление виброметром" 
+                               FontAttributes="Bold" 
+                               FontSize="16"
+                               TextColor="#1976D2"
+                               HorizontalOptions="Center"/>
+
+                        <BoxView Color="#E0E0E0" HeightRequest="1" Margin="0,4,0,8"/>
+
+                        <Button Text="🔗 Подключить" 
+                                Command="{Binding ConnectVibrometerCommand}"
+                                BackgroundColor="#2196F3"
+                                TextColor="White"
+                                CornerRadius="20"
+                                HeightRequest="45"
+                                FontAttributes="Bold"
+                                FontSize="14"/>
+
+                        <Button Text="▶️ Запуск опроса" 
+                                Command="{Binding PollVibrometerCommand}"
+                                IsEnabled="{Binding IsNotPollingVibrometer}"
+                                BackgroundColor="#4CAF50"
+                                TextColor="White"
+                                CornerRadius="20"
+                                HeightRequest="45"
+                                FontAttributes="Bold"
+                                FontSize="14"/>
+
+                        <Button Text="⏹️ Остановка" 
+                                Command="{Binding StopVibrometerCommand}"
+                                IsEnabled="{Binding IsPollingVibrometer}"
+                                BackgroundColor="#F44336"
+                                TextColor="White"
+                                CornerRadius="20"
+                                HeightRequest="45"
+                                FontAttributes="Bold"
+                                FontSize="14"/>
+                    </StackLayout>
+                </Frame>
+
+                <!-- Индикаторы состояния -->
+                <Frame BackgroundColor="#FFF3E0" Padding="12" HasShadow="False" CornerRadius="8"
+                       IsVisible="{Binding IsBusy}">
+                    <StackLayout Orientation="Horizontal" Spacing="8">
+                        <ActivityIndicator IsVisible="{Binding IsBusy}" 
+                                         IsRunning="{Binding IsBusy}"
+                                         Color="#FF9800"/>
+                        <Label Text="Идет обработка..." 
+                               FontAttributes="Italic"
+                               TextColor="#FF9800"
+                               VerticalOptions="Center"
+                               FontSize="12"/>
+                    </StackLayout>
+                </Frame>
+
+                <Frame BackgroundColor="#E8F5E8" Padding="12" HasShadow="False" CornerRadius="8"
+                       IsVisible="{Binding IsPollingVibrometer}">
+                    <StackLayout Orientation="Horizontal" Spacing="8">
+                        <Label Text="🔄" FontSize="14"/>
+                        <Label Text="Идет опрос виброметра..." 
+                               FontAttributes="Italic"
+                               TextColor="#4CAF50"
+                               VerticalOptions="Center"
+                               FontSize="12"/>
+                    </StackLayout>
+                </Frame>
+            </StackLayout>
+        </ScrollView>
+    </ContentPage>
+</TabbedPage>

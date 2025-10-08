@@ -16,7 +16,16 @@ namespace DiagnosticNP.Droid
     {
         protected override void OnCreate(Bundle savedInstanceState)
         {
+            // Включите отладку рендеринга
+            global::Xamarin.Forms.Forms.SetFlags("CollectionView_Experimental");
+
+            // Для Android 10+ требуется включить аппаратное ускорение
+            Window.SetFlags(Android.Views.WindowManagerFlags.HardwareAccelerated, Android.Views.WindowManagerFlags.HardwareAccelerated);
+
+           
             base.OnCreate(savedInstanceState);
+
+            Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense("Njc4NTkxQDMyMzAyZTMyMmUzMFdGQkpoWWhnZEsrNUc1amo1b1R1eXF6TXVlNm8vRzA4RHQzZGI5Umd6ZlU9");
 
             Xamarin.Essentials.Platform.Init(this, savedInstanceState);
             global::Xamarin.Forms.Forms.Init(this, savedInstanceState);
