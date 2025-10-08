@@ -119,6 +119,7 @@
                     <!-- Полное дерево -->
                     <syncfusion:SfTreeView x:Name="fullTreeView"
                                           ItemsSource="{Binding EquipmentTree}"
+                                          NotificationSubscriptionMode="CollectionChange"
                                           ChildPropertyName="Children"
                                           AutoExpandMode="None"
                                           ItemHeight="42"
