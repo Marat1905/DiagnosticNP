@@ -1,594 +1,282 @@
-﻿using DiagnosticNP.Models;
-using DiagnosticNP.Models.Nfc;
-using DiagnosticNP.Models.Vibrometer;
+﻿using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows.Input;
+using DiagnosticNP.Data;
+using DiagnosticNP.Models;
 using DiagnosticNP.Services;
 using DiagnosticNP.Services.Bluetooth;
 using DiagnosticNP.Services.Nfc;
 using DiagnosticNP.Services.Utils;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Windows.Input;
+using DiagnosticNP.Views;
 using Xamarin.Forms;
 
 namespace DiagnosticNP.ViewModels
 {
     public class MainViewModel : BaseViewModel
     {
+        private readonly IApiService _apiService;
+        private readonly IEquipmentRepository _equipmentRepository;
+        private readonly IMeasurementRepository _measurementRepository;
         private readonly INfcService _nfcService;
-        private DiagnosticData _diagnosticData;
-        private bool _isListening;
 
-        // Данные виброметра
-        private DateTime _lastAdvertising;
-        private double _velocity;
-        private double _acceleration;
-        private double _kurtosis;
-        private double _temperature;
-        private string _vibrometerDevice;
-        private bool _isPollingVibrometer;
-        private bool _isBusy;
+        private EquipmentNode _selectedNode;
+        private string _nfcFilter;
+        private bool _isLoading;
 
         public MainViewModel()
         {
+            _apiService = new MockApiService();
+            _equipmentRepository = new EquipmentRepository();
+            _measurementRepository = new MeasurementRepository();
             _nfcService = new NfcService();
-            _diagnosticData = new DiagnosticData();
-            _nfcService.TagScanned += OnTagScanned;
+
+            EquipmentNodes = new ObservableCollection<EquipmentNode>();
+            FilteredNodes = new ObservableCollection<EquipmentNode>();
 
             InitializeCommands();
+            LoadEquipmentStructure();
             InitializeNfc();
-            InitializeVibrometer();
         }
 
-        public DiagnosticData DiagnosticData
-        {
-            get => _diagnosticData;
-            set => SetProperty(ref _diagnosticData, value);
-        }
+        public ObservableCollection<EquipmentNode> EquipmentNodes { get; }
+        public ObservableCollection<EquipmentNode> FilteredNodes { get; }
 
-        public bool IsListening
+        public EquipmentNode SelectedNode
         {
-            get => _isListening;
-            set => SetProperty(ref _isListening, value);
-        }
-
-        // Свойства виброметра
-        public DateTime LastAdvertising
-        {
-            get => _lastAdvertising;
-            set => SetProperty(ref _lastAdvertising, value);
-        }
-
-        public double Velocity
-        {
-            get => _velocity;
-            set => SetProperty(ref _velocity, value);
-        }
-
-        public double Acceleration
-        {
-            get => _acceleration;
-            set => SetProperty(ref _acceleration, value);
-        }
-
-        public double Kurtosis
-        {
-            get => _kurtosis;
-            set => SetProperty(ref _kurtosis, value);
-        }
-
-        public double Temperature
-        {
-            get => _temperature;
-            set => SetProperty(ref _temperature, value);
-        }
-
-        public bool IsPollingVibrometer
-        {
-            get => _isPollingVibrometer;
+            get => _selectedNode;
             set
             {
-                SetProperty(ref _isPollingVibrometer, value);
-                OnPropertyChanged(nameof(IsNotPollingVibrometer));
+                SetProperty(ref _selectedNode, value);
+                OnPropertyChanged(nameof(IsDirectionSelected));
+                if (value?.Type == NodeType.Direction)
+                {
+                    ShowMeasurementPage(value);
+                }
             }
         }
 
-        public bool IsNotPollingVibrometer => !IsPollingVibrometer;
-
-        public bool IsBusy
+        public string NfcFilter
         {
-            get => _isBusy;
+            get => _nfcFilter;
             set
             {
-                SetProperty(ref _isBusy, value);
-                OnPropertyChanged(nameof(IsReady));
+                SetProperty(ref _nfcFilter, value);
+                ApplyNfcFilter();
             }
         }
 
-        public bool IsReady => !_isBusy;
+        public bool IsLoading
+        {
+            get => _isLoading;
+            set => SetProperty(ref _isLoading, value);
+        }
 
-        // Команды
-        public ICommand StartListeningCommand { get; private set; }
-        public ICommand StopListeningCommand { get; private set; }
-        public ICommand ReadTagCommand { get; private set; }
-        public ICommand StartVibrometerCommand { get; private set; }
-        public ICommand StopVibrometerCommand { get; private set; }
-        public ICommand PollVibrometerCommand { get; private set; }
-        public ICommand ConnectVibrometerCommand { get; private set; }
-        public ICommand DisconnectVibrometerCommand { get; private set; }
+        public bool IsDirectionSelected => SelectedNode?.Type == NodeType.Direction;
+
+        public ICommand LoadControlPointsCommand { get; private set; }
+        public ICommand UploadDataCommand { get; private set; }
+        public ICommand ClearDataCommand { get; private set; }
+        public ICommand ShowMeasurementPageCommand { get; private set; }
 
         private void InitializeCommands()
         {
-            // NFC команды
-            StartListeningCommand = new Command(async () => await StartListening());
-            StopListeningCommand = new Command(StopListening);
-            ReadTagCommand = new Command(async () => await ReadTag());
-
-            // Команды виброметра
-            StartVibrometerCommand = new Command(async () => await StartVibrometerMeasurement());
-            StopVibrometerCommand = new Command(StopVibrometer);
-            PollVibrometerCommand = new Command(async () => await PollVibrometer());
-            ConnectVibrometerCommand = new Command(async () => await ConnectVibrometer());
-            DisconnectVibrometerCommand = new Command(async () => await DisconnectVibrometer());
+            LoadControlPointsCommand = new Command(async () => await LoadControlPointsAsync());
+            UploadDataCommand = new Command(async () => await UploadDataAsync());
+            ClearDataCommand = new Command(async () => await ClearDataAsync());
+            ShowMeasurementPageCommand = new Command<EquipmentNode>(node => ShowMeasurementPage(node));
         }
 
-        private void InitializeVibrometer()
+        private async void LoadEquipmentStructure()
         {
-            // Запуск сканирования BLE устройств
-            if (!BluetoothController.LeScanner.IsRunning)
-                BluetoothController.LeScanner.Restart();
-
-            BluetoothController.LeScanner.NewData += OnVibrometerDataReceived;
-        }
-
-        private void OnVibrometerDataReceived(object sender, BleDataEventArgs e)
-        {
-            Device.BeginInvokeOnMainThread(() => ProcessVibrometerData(e));
-        }
-
-        private void ProcessVibrometerData(BleDataEventArgs e)
-        {
-            try
+            var nodes = await _equipmentRepository.GetEquipmentStructureAsync();
+            if (nodes.Any())
             {
-                // Не обрабатываем advertising данные во время активного опроса
-                if (IsPollingVibrometer) return;
-
-                _vibrometerDevice = e.Data.Address;
-                var data = e.Data.Data.BytesToStruct<ViPenAdvertising>();
-
-                Velocity = Math.Round(data.Velocity * 0.01, 2);
-                Acceleration = Math.Round(data.Acceleration * 0.01, 2);
-                Kurtosis = Math.Round(data.Kurtosis * 0.01, 2);
-                Temperature = Math.Round(data.Temperature * 0.01, 2);
-                LastAdvertising = DateTime.Now;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Ошибка обработки данных виброметра: {ex.Message}");
+                Device.BeginInvokeOnMainThread(() =>
+                {
+                    EquipmentNodes.Clear();
+                    foreach (var node in nodes)
+                    {
+                        EquipmentNodes.Add(node);
+                    }
+                    ApplyNfcFilter();
+                });
             }
         }
 
-        private async Task ConnectVibrometer()
+        private async Task LoadControlPointsAsync()
         {
-            if (_isConnectingInProgress) return;
-
-            _isConnectingInProgress = true;
-
+            IsLoading = true;
             try
             {
-                if (string.IsNullOrEmpty(_vibrometerDevice))
+                var controlPoints = await _apiService.DownloadControlPointsAsync();
+                if (controlPoints != null && controlPoints.Any())
+                {
+                    await _equipmentRepository.SaveEquipmentStructureAsync(controlPoints);
+
+                    Device.BeginInvokeOnMainThread(() =>
+                    {
+                        EquipmentNodes.Clear();
+                        foreach (var node in controlPoints)
+                        {
+                            EquipmentNodes.Add(node);
+                        }
+                        ApplyNfcFilter();
+                    });
+
+                    await Application.Current.MainPage.DisplayAlert("Успех",
+                        "Контрольные точки успешно загружены", "OK");
+                }
+                else
                 {
                     await Application.Current.MainPage.DisplayAlert("Ошибка",
-                        "Виброметр не найден. Убедитесь, что устройство включено и доступно.", "OK");
-                    return;
-                }
-
-                IsBusy = true;
-
-                using (var controller = VPenControlManager.GetController())
-                {
-                    var token = new OperationToken();
-
-                    // Добавляем таймаут для всего процесса подключения
-                    using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30)))
-                    {
-                        try
-                        {
-                            var connectTask = controller.ConnectAsync(_vibrometerDevice, token);
-                            var completedTask = await Task.WhenAny(connectTask, Task.Delay(-1, cts.Token));
-
-                            if (completedTask == connectTask && connectTask.Result)
-                            {
-                                await Application.Current.MainPage.DisplayAlert("Успех",
-                                    "Подключение к виброметру установлено", "OK");
-                            }
-                            else
-                            {
-                                await Application.Current.MainPage.DisplayAlert("Ошибка",
-                                    "Не удалось подключиться к виброметру (таймаут)", "OK");
-                            }
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            await Application.Current.MainPage.DisplayAlert("Ошибка",
-                                "Таймаут подключения к виброметру", "OK");
-                        }
-                    }
+                        "Не удалось загрузить контрольные точки", "OK");
                 }
             }
             catch (Exception ex)
             {
                 await Application.Current.MainPage.DisplayAlert("Ошибка",
-                    $"Ошибка подключения к виброметру: {ex.Message}", "OK");
+                    $"Ошибка загрузки: {ex.Message}", "OK");
             }
             finally
             {
-                IsBusy = false;
-                _isConnectingInProgress = false;
+                IsLoading = false;
             }
         }
 
-        private bool _isConnectingInProgress = false;
-
-        private async Task DisconnectVibrometer()
+        private async Task UploadDataAsync()
         {
+            IsLoading = true;
             try
             {
-                using (var controller = VPenControlManager.GetController())
+                var unsyncedMeasurements = await _measurementRepository.GetUnsyncedMeasurementsAsync();
+                if (unsyncedMeasurements.Any())
                 {
-                    await controller.Disconnect();
-                    await Application.Current.MainPage.DisplayAlert("Успех",
-                        "Отключено от виброметра", "OK");
-                }
-            }
-            catch (Exception ex)
-            {
-                await Application.Current.MainPage.DisplayAlert("Ошибка",
-                    $"Ошибка отключения от виброметра: {ex.Message}", "OK");
-            }
-        }
-
-        private async Task StartVibrometerMeasurement()
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(_vibrometerDevice))
-                {
-                    await Application.Current.MainPage.DisplayAlert("Ошибка",
-                        "Сначала подключитесь к виброметру", "OK");
-                    return;
-                }
-
-                IsBusy = true;
-
-                using (var controller = VPenControlManager.GetController())
-                {
-                    var token = new OperationToken();
-                    if (await controller.StartMeasurementAsync(_vibrometerDevice, token))
+                    var success = await _apiService.UploadMeasurementsAsync(unsyncedMeasurements);
+                    if (success)
                     {
+                        foreach (var measurement in unsyncedMeasurements)
+                        {
+                            await _measurementRepository.MarkAsSyncedAsync(measurement.Id);
+                        }
+
                         await Application.Current.MainPage.DisplayAlert("Успех",
-                            "Измерение виброметром запущено", "OK");
+                            $"Данные успешно выгружены ({unsyncedMeasurements.Count} замеров)", "OK");
                     }
                     else
                     {
                         await Application.Current.MainPage.DisplayAlert("Ошибка",
-                            "Не удалось запустить измерение", "OK");
+                            "Не удалось выгрузить данные", "OK");
                     }
-                }
-            }
-            catch (Exception ex)
-            {
-                await Application.Current.MainPage.DisplayAlert("Ошибка",
-                    $"Ошибка запуска измерения: {ex.Message}", "OK");
-            }
-            finally
-            {
-                IsBusy = false;
-            }
-        }
-
-        private async Task PollVibrometer()
-        {
-            System.Diagnostics.Debug.WriteLine("=== ЗАПУСК ОПРОСА ВИБРОМЕТРА ===");
-
-            try
-            {
-                if (string.IsNullOrEmpty(_vibrometerDevice))
-                {
-                    await Application.Current.MainPage.DisplayAlert("Ошибка",
-                        "Виброметр не найден", "OK");
-                    return;
-                }
-
-                IsPollingVibrometer = true;
-                int successfulPolls = 0;
-                int consecutiveErrors = 0;
-                const int maxConsecutiveErrors = 3;
-
-                // Останавливаем автоматическое сканирование
-                BluetoothController.LeScanner.Stop();
-                await Task.Delay(500);
-
-                using (var controller = VPenControlManager.GetController())
-                {
-                    var token = new OperationToken();
-
-                    // Подключаемся к устройству
-                    System.Diagnostics.Debug.WriteLine("Подключение к устройству...");
-                    if (!await controller.ConnectAsync(_vibrometerDevice, token))
-                    {
-                        await Application.Current.MainPage.DisplayAlert("Ошибка",
-                            "Не удалось подключиться к виброметру", "OK");
-                        IsPollingVibrometer = false;
-                        return;
-                    }
-
-                    // Запускаем измерение
-                    try
-                    {
-                        System.Diagnostics.Debug.WriteLine("Отправка команды START...");
-                        await controller.Start(_vibrometerDevice, token);
-                        System.Diagnostics.Debug.WriteLine("Команда START отправлена");
-                    }
-                    catch (Exception startEx)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Ошибка отправки START: {startEx.Message}");
-                        // Продолжаем, возможно устройство уже в режиме измерения
-                    }
-
-                    // Основной цикл опроса
-                    while (IsPollingVibrometer)
-                    {
-                        try
-                        {
-                            // Проверяем соединение
-                            if (!controller.IsConnected)
-                            {
-                                System.Diagnostics.Debug.WriteLine("Соединение потеряно, попытка восстановления...");
-                                consecutiveErrors++;
-
-                                if (consecutiveErrors > maxConsecutiveErrors)
-                                {
-                                    System.Diagnostics.Debug.WriteLine("Слишком много ошибок, останавливаю опрос");
-                                    break;
-                                }
-
-                                // Быстрое переподключение
-                                await Task.Delay(300);
-                                if (await controller.ConnectAsync(_vibrometerDevice, token))
-                                {
-                                    System.Diagnostics.Debug.WriteLine("Соединение восстановлено");
-                                    consecutiveErrors = 0;
-
-                                    // Повторно отправляем START после переподключения
-                                    try
-                                    {
-                                        await controller.Start(_vibrometerDevice, token);
-                                    }
-                                    catch { /* Игнорируем ошибки повторного START */ }
-                                }
-                                continue;
-                            }
-
-                            // Чтение данных
-                            var data = await controller.ReadUserData(_vibrometerDevice, token);
-
-                            // Обновление UI
-                            Device.BeginInvokeOnMainThread(() =>
-                            {
-                                Velocity = Math.Round(data.Values[0] * 0.01, 2);
-                                Acceleration = Math.Round(data.Values[1] * 0.01, 2);
-                                Kurtosis = Math.Round(data.Values[2] * 0.01, 2);
-                                Temperature = Math.Round(data.Values[3] * 0.01, 2);
-                                LastAdvertising = DateTime.Now;
-                            });
-
-                            successfulPolls++;
-                            consecutiveErrors = 0;
-
-                            // Короткая пауза между опросами
-                            await Task.Delay(800);
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Ошибка в цикле опроса: {ex.Message}");
-                            consecutiveErrors++;
-
-                            if (consecutiveErrors > maxConsecutiveErrors)
-                            {
-                                System.Diagnostics.Debug.WriteLine("Слишком много ошибок подряд, останавливаю опрос");
-                                break;
-                            }
-
-                            await Task.Delay(500);
-                        }
-                    }
-
-                    // Корректное завершение
-                    System.Diagnostics.Debug.WriteLine("Завершение опроса...");
-                    try
-                    {
-                        if (controller.IsConnected)
-                        {
-                            await controller.Stop(_vibrometerDevice, token);
-                            await Task.Delay(200);
-                            await controller.Disconnect();
-                        }
-                    }
-                    catch (Exception stopEx)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Ошибка при остановке: {stopEx.Message}");
-                    }
-
-                    System.Diagnostics.Debug.WriteLine($"ОПРОС ЗАВЕРШЕН. Успешных опросов: {successfulPolls}");
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"КРИТИЧЕСКАЯ ОШИБКА ОПРОСА: {ex.Message}");
-                await Application.Current.MainPage.DisplayAlert("Ошибка",
-                    $"Ошибка опроса виброметра: {ex.Message}", "OK");
-            }
-            finally
-            {
-                IsPollingVibrometer = false;
-
-                // Восстанавливаем сканирование с задержкой
-                await Task.Delay(1000);
-                if (!BluetoothController.LeScanner.IsRunning)
-                {
-                    BluetoothController.LeScanner.Start();
-                }
-
-                System.Diagnostics.Debug.WriteLine("=== ОПРОС ОСТАНОВЛЕН ===");
-            }
-        }
-
-        // Быстрый метод переподключения
-        private async Task<bool> QuickReconnect(IVPenControl controller, string deviceAddress, OperationToken token)
-        {
-            try
-            {
-                await controller.Disconnect();
-                await Task.Delay(300);
-                return await controller.ConnectAsync(deviceAddress, token);
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private void StopVibrometer()
-        {
-            IsPollingVibrometer = false;
-        }
-
-        private async void InitializeNfc()
-        {
-            try
-            {
-                var isAvailable = await _nfcService.IsAvailableAsync();
-                if (!isAvailable)
-                {
-                    await Application.Current.MainPage.DisplayAlert("Информация",
-                        "NFC не поддерживается на этом устройстве", "OK");
-                }
-            }
-            catch (Exception ex)
-            {
-                await Application.Current.MainPage.DisplayAlert("Ошибка",
-                    $"Ошибка инициализации NFC: {ex.Message}", "OK");
-            }
-        }
-
-        private async Task StartListening()
-        {
-            try
-            {
-                if (!await _nfcService.IsEnabledAsync())
-                {
-                    await Application.Current.MainPage.DisplayAlert("Ошибка",
-                        "NFC отключен. Включите NFC в настройках устройства.", "OK");
-                    return;
-                }
-
-                _nfcService.StartListening();
-                IsListening = true;
-
-                await Application.Current.MainPage.DisplayAlert("Успех",
-                    "Сканирование NFC запущено. Поднесите метку к устройству.", "OK");
-            }
-            catch (Exception ex)
-            {
-                await Application.Current.MainPage.DisplayAlert("Ошибка",
-                    $"Ошибка запуска сканирования: {ex.Message}", "OK");
-            }
-        }
-
-        private void StopListening()
-        {
-            try
-            {
-                _nfcService.StopListening();
-                IsListening = false;
-
-                Application.Current.MainPage.DisplayAlert("Успех",
-                    "Сканирование NFC остановлено", "OK");
-            }
-            catch (Exception ex)
-            {
-                Application.Current.MainPage.DisplayAlert("Ошибка",
-                    $"Ошибка остановки сканирования: {ex.Message}", "OK");
-            }
-        }
-
-        private async Task ReadTag()
-        {
-            try
-            {
-                if (!await _nfcService.IsEnabledAsync())
-                {
-                    await Application.Current.MainPage.DisplayAlert("Ошибка",
-                        "NFC отключен", "OK");
-                    return;
-                }
-
-                var tagData = await _nfcService.ReadTagAsync();
-                if (!string.IsNullOrEmpty(tagData))
-                {
-                    DiagnosticData.NFCData = tagData;
-                    DiagnosticData.ScanTime = DateTime.Now;
-
-                    await Application.Current.MainPage.DisplayAlert("Успех",
-                        $"Метка прочитана: {tagData}", "OK");
                 }
                 else
                 {
                     await Application.Current.MainPage.DisplayAlert("Информация",
-                        "Не удалось прочитать метку или метка пуста", "OK");
+                        "Нет данных для выгрузки", "OK");
                 }
             }
             catch (Exception ex)
             {
                 await Application.Current.MainPage.DisplayAlert("Ошибка",
-                    $"Ошибка чтения метки: {ex.Message}", "OK");
+                    $"Ошибка выгрузки: {ex.Message}", "OK");
+            }
+            finally
+            {
+                IsLoading = false;
             }
         }
 
-        private void OnTagScanned(object sender, string nfcData)
+        private async Task ClearDataAsync()
+        {
+            var result = await Application.Current.MainPage.DisplayAlert("Подтверждение",
+                "Очистить все данные замеров?", "Да", "Нет");
+
+            if (result)
+            {
+                await _measurementRepository.ClearMeasurementsAsync();
+                await Application.Current.MainPage.DisplayAlert("Успех",
+                    "Данные очищены", "OK");
+            }
+        }
+
+        private void ShowMeasurementPage(EquipmentNode node)
+        {
+            if (node?.Type == NodeType.Direction)
+            {
+                var measurementVM = new MeasurementViewModel(node, _measurementRepository);
+                var measurementPage = new MeasurementPage { BindingContext = measurementVM };
+                Application.Current.MainPage.Navigation.PushAsync(measurementPage);
+            }
+        }
+
+        private void InitializeNfc()
+        {
+            _nfcService.TagScanned += OnNfcTagScanned;
+            _nfcService.StartListening();
+        }
+
+        private void OnNfcTagScanned(object sender, string nfcData)
         {
             Device.BeginInvokeOnMainThread(() =>
             {
-                DiagnosticData.NFCData = nfcData;
-                DiagnosticData.ScanTime = DateTime.Now;
-
-                Application.Current.MainPage.DisplayAlert("Успех",
-                    $"Метка просканирована: {nfcData}", "OK");
+                NfcFilter = nfcData;
+                ApplyNfcFilter();
             });
         }
 
-        public async void OnDisappearing()
+        private void ApplyNfcFilter()
         {
-            try
-            {
-                BluetoothController.LeScanner.NewData -= OnVibrometerDataReceived;
-                _nfcService?.StopListening();
+            FilteredNodes.Clear();
 
-                // Асинхронная остановка виброметра
-                if (IsPollingVibrometer)
+            if (string.IsNullOrWhiteSpace(NfcFilter))
+            {
+                foreach (var node in EquipmentNodes)
                 {
-                    IsPollingVibrometer = false;
-                    await Task.Delay(1000); // Даем время на завершение
+                    FilteredNodes.Add(node);
                 }
-
-                // Принудительная очистка BLE
-                BluetoothController.LeScanner.Stop();
             }
-            catch (Exception ex)
+            else
             {
-                System.Diagnostics.Debug.WriteLine($"Ошибка при очистке ресурсов: {ex.Message}");
+                var filtered = FilterNodes(EquipmentNodes, NfcFilter);
+                foreach (var node in filtered)
+                {
+                    FilteredNodes.Add(node);
+                }
             }
+        }
+
+        private List<EquipmentNode> FilterNodes(IEnumerable<EquipmentNode> nodes, string filter)
+        {
+            var result = new List<EquipmentNode>();
+
+            foreach (var node in nodes)
+            {
+                // Использование IndexOf для регистронезависимого поиска
+                if (node.FullPath.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    result.Add(node);
+                }
+                else if (node.Children.Any())
+                {
+                    var childResults = FilterNodes(node.Children, filter);
+                    if (childResults.Any())
+                    {
+                        var expandedNode = node;
+                        expandedNode.IsExpanded = true;
+                        result.Add(expandedNode);
+                        result.AddRange(childResults);
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        public void OnDisappearing()
+        {
+            _nfcService?.StopListening();
         }
     }
 }

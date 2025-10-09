@@ -77,6 +77,7 @@
     <Compile Include="Bluetooth\GATTConetionTools.cs" />
     <Compile Include="Bluetooth\ViPenLeScanner.cs" />
     <Compile Include="Bluetooth\VPenControl.cs" />
+    <Compile Include="DatabasePath.cs" />
     <Compile Include="MainActivity.cs" />
     <Compile Include="Resources\Resource.designer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

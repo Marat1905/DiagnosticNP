@@ -1,0 +1,129 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DiagnosticNP.Views.MeasurementPage"
+             Title="Замер вибрации">
+
+    <ScrollView>
+        <StackLayout Padding="20" Spacing="15">
+
+            <!-- Header -->
+            <Label Text="{Binding DirectionName}" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center"/>
+            <Label Text="{Binding FullPath}" FontSize="12" TextColor="Gray" HorizontalOptions="Center"/>
+
+            <!-- Measurement Form -->
+            <Frame BackgroundColor="White" BorderColor="LightGray">
+                <StackLayout Spacing="10">
+                    <Label Text="Параметры замера:" FontAttributes="Bold"/>
+
+                    <StackLayout Orientation="Horizontal">
+                        <Label Text="Скорость вибрации:" VerticalOptions="Center"/>
+                        <Entry Text="{Binding Velocity}" Keyboard="Numeric" HorizontalOptions="FillAndExpand"/>
+                        <Label Text="мм/с" VerticalOptions="Center"/>
+                    </StackLayout>
+
+                    <StackLayout Orientation="Horizontal">
+                        <Label Text="Температура:" VerticalOptions="Center"/>
+                        <Entry Text="{Binding Temperature}" Keyboard="Numeric" HorizontalOptions="FillAndExpand"/>
+                        <Label Text="°C" VerticalOptions="Center"/>
+                    </StackLayout>
+
+                    <StackLayout Orientation="Horizontal">
+                        <Label Text="Ускорение:" VerticalOptions="Center"/>
+                        <Entry Text="{Binding Acceleration}" Keyboard="Numeric" HorizontalOptions="FillAndExpand"/>
+                        <Label Text="м/с²" VerticalOptions="Center"/>
+                    </StackLayout>
+
+                    <StackLayout Orientation="Horizontal">
+                        <Label Text="Куртозис:" VerticalOptions="Center"/>
+                        <Entry Text="{Binding Kurtosis}" Keyboard="Numeric" HorizontalOptions="FillAndExpand"/>
+                    </StackLayout>
+                </StackLayout>
+            </Frame>
+
+            <!-- Common Save Button -->
+            <Button Text="Сохранить замер" 
+                    Command="{Binding SaveMeasurementCommand}"
+                    BackgroundColor="Blue"
+                    TextColor="White"
+                    FontSize="16"/>
+
+            <!-- Manual Controls -->
+            <StackLayout Spacing="10">
+                <Label Text="Ручной ввод:" FontAttributes="Bold"/>
+                <Button Text="Очистить форму" 
+                        Command="{Binding ClearFormCommand}"
+                        BackgroundColor="Gray"
+                        TextColor="White"/>
+            </StackLayout>
+
+            <!-- Vibrometer Controls -->
+            <StackLayout Spacing="10">
+                <Label Text="Виброметр ViPen:" FontAttributes="Bold"/>
+
+                <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="10">
+                    <Button Text="Подключить" 
+                            Command="{Binding ConnectVibrometerCommand}"
+                            IsEnabled="{Binding IsVibrometerConnected, Converter={StaticResource InverseBooleanConverter}}"
+                            IsVisible="{Binding CanUseVibrometer}"
+                            BackgroundColor="Green"
+                            TextColor="White"/>
+
+                    <Button Text="Отключить" 
+                            Command="{Binding DisconnectVibrometerCommand}"
+                            IsEnabled="{Binding IsVibrometerConnected}"
+                            IsVisible="{Binding CanUseVibrometer}"
+                            BackgroundColor="Red"
+                            TextColor="White"/>
+                </StackLayout>
+
+                <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="10">
+                    <Button Text="Начать измерение" 
+                            Command="{Binding StartVibrometerMeasurementCommand}"
+                            IsEnabled="{Binding IsVibrometerConnected}"
+                            IsVisible="{Binding CanUseVibrometer}"
+                            BackgroundColor="DarkGreen"
+                            TextColor="White"/>
+
+                    <Button Text="Остановить" 
+                            Command="{Binding StopVibrometerMeasurementCommand}"
+                            IsEnabled="{Binding IsMeasuring}"
+                            IsVisible="{Binding CanUseVibrometer}"
+                            BackgroundColor="DarkRed"
+                            TextColor="White"/>
+                </StackLayout>
+
+                <Label Text="Виброметр недоступен" 
+                       IsVisible="{Binding CanUseVibrometer, Converter={StaticResource InverseBooleanConverter}}"
+                       TextColor="Orange"
+                       HorizontalOptions="Center"/>
+            </StackLayout>
+
+            <!-- Status Indicators -->
+            <StackLayout Spacing="5">
+                <Label Text="✓ Виброметр подключен" 
+                       IsVisible="{Binding IsVibrometerConnected}"
+                       TextColor="Green"
+                       HorizontalOptions="Center"/>
+
+                <Label Text="🔄 Идет измерение..." 
+                       IsVisible="{Binding IsMeasuring}"
+                       TextColor="Blue"
+                       HorizontalOptions="Center"/>
+            </StackLayout>
+
+            <!-- Latest Measurement -->
+            <Frame BackgroundColor="LightYellow" IsVisible="{Binding LatestMeasurement.HasData}">
+                <StackLayout>
+                    <Label Text="Последний замер:" FontAttributes="Bold"/>
+                    <Label Text="{Binding LatestMeasurement.MeasurementTime, StringFormat='Время: {0:dd.MM.yyyy HH:mm}'}"/>
+                    <Label Text="{Binding LatestMeasurement.Velocity, StringFormat='Скорость: {0} мм/с'}"/>
+                    <Label Text="{Binding LatestMeasurement.Temperature, StringFormat='Температура: {0} °C'}"/>
+                    <Label Text="{Binding LatestMeasurement.Acceleration, StringFormat='Ускорение: {0} м/с²'}"/>
+                    <Label Text="{Binding LatestMeasurement.Kurtosis, StringFormat='Куртозис: {0}'}"/>
+                    <Label Text="{Binding LatestMeasurement.IsManualEntry, StringFormat='Тип: {0}'}"/>
+                </StackLayout>
+            </Frame>
+        </StackLayout>
+    </ScrollView>
+</ContentPage>
