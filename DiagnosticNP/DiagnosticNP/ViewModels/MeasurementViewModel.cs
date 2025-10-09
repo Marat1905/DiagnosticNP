@@ -4,6 +4,7 @@ using DiagnosticNP.Models.Vibrometer;
 using DiagnosticNP.Services.Bluetooth;
 using DiagnosticNP.Services.Utils;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Xamarin.Forms;
@@ -14,21 +15,28 @@ namespace DiagnosticNP.ViewModels
     {
         private readonly EquipmentNode _directionNode;
         private readonly IMeasurementRepository _measurementRepository;
+        private readonly IVPenControl _vipenController;
 
         private double _velocity;
         private double _temperature;
         private double _acceleration;
         private double _kurtosis;
-        private bool _isMeasuring;
+        private bool _isPolling;
+        private string _connectionStatus;
         private MeasurementData _latestMeasurement;
+        private CancellationTokenSource _pollingCancellationToken;
+        private string _deviceAddress;
 
-        public MeasurementViewModel(EquipmentNode directionNode, IMeasurementRepository measurementRepository)
+        public MeasurementViewModel(EquipmentNode directionNode, IMeasurementRepository measurementRepository, string deviceAddress = null)
         {
             _directionNode = directionNode;
             _measurementRepository = measurementRepository;
+            _deviceAddress = deviceAddress;
+            _vipenController = VPenControlManager.GetController();
 
             InitializeCommands();
             LoadLatestMeasurement();
+            UpdateConnectionStatus();
         }
 
         public string DirectionName => _directionNode?.Name ?? "Неизвестно";
@@ -58,10 +66,16 @@ namespace DiagnosticNP.ViewModels
             set => SetProperty(ref _kurtosis, value);
         }
 
-        public bool IsMeasuring
+        public bool IsPolling
         {
-            get => _isMeasuring;
-            set => SetProperty(ref _isMeasuring, value);
+            get => _isPolling;
+            set => SetProperty(ref _isPolling, value);
+        }
+
+        public string ConnectionStatus
+        {
+            get => _connectionStatus;
+            set => SetProperty(ref _connectionStatus, value);
         }
 
         public MeasurementData LatestMeasurement
@@ -70,37 +84,54 @@ namespace DiagnosticNP.ViewModels
             set => SetProperty(ref _latestMeasurement, value);
         }
 
-        public ICommand SaveManualMeasurementCommand { get; private set; }
-        public ICommand StartVibrometerMeasurementCommand { get; private set; }
-        public ICommand StopVibrometerMeasurementCommand { get; private set; }
+        public bool CanUseVibrometer => !string.IsNullOrEmpty(_deviceAddress);
+
+        public ICommand SaveMeasurementCommand { get; private set; }
+        public ICommand StartPollingCommand { get; private set; }
+        public ICommand StopPollingCommand { get; private set; }
         public ICommand ClearFormCommand { get; private set; }
 
         private void InitializeCommands()
         {
-            SaveManualMeasurementCommand = new Command(async () => await SaveManualMeasurementAsync());
-            StartVibrometerMeasurementCommand = new Command(async () => await StartVibrometerMeasurementAsync());
-            StopVibrometerMeasurementCommand = new Command(async () => await StopVibrometerMeasurementAsync());
+            SaveMeasurementCommand = new Command(async () => await SaveMeasurementAsync());
+            StartPollingCommand = new Command(async () => await StartPollingAsync());
+            StopPollingCommand = new Command(async () => await StopPollingAsync());
             ClearFormCommand = new Command(ClearForm);
         }
 
         private async void LoadLatestMeasurement()
         {
-            LatestMeasurement = await _measurementRepository.GetLatestMeasurementAsync(
-                _directionNode.Id, _directionNode.Name);
-
-            if (LatestMeasurement != null)
+            if (_directionNode != null)
             {
-                Velocity = LatestMeasurement.Velocity;
-                Temperature = LatestMeasurement.Temperature;
-                Acceleration = LatestMeasurement.Acceleration;
-                Kurtosis = LatestMeasurement.Kurtosis;
+                LatestMeasurement = await _measurementRepository.GetLatestMeasurementAsync(
+                    _directionNode.Id, _directionNode.Name);
+
+                if (LatestMeasurement != null)
+                {
+                    Velocity = LatestMeasurement.Velocity;
+                    Temperature = LatestMeasurement.Temperature;
+                    Acceleration = LatestMeasurement.Acceleration;
+                    Kurtosis = LatestMeasurement.Kurtosis;
+                }
             }
         }
 
-        private async Task SaveManualMeasurementAsync()
+        private void UpdateConnectionStatus()
+        {
+            ConnectionStatus = _vipenController.IsConnected ? "Подключено" : "Не подключено";
+        }
+
+        public async Task SaveMeasurementAsync()
         {
             try
             {
+                if (_directionNode == null)
+                {
+                    await Application.Current.MainPage.DisplayAlert("Ошибка",
+                        "Не выбрана точка измерения", "OK");
+                    return;
+                }
+
                 var measurement = new MeasurementData
                 {
                     NodeId = _directionNode.Id,
@@ -111,8 +142,9 @@ namespace DiagnosticNP.ViewModels
                     Acceleration = Acceleration,
                     Kurtosis = Kurtosis,
                     MeasurementTime = DateTime.Now,
-                    IsManualEntry = true,
-                    IsSynced = false
+                    IsManualEntry = !IsPolling,
+                    IsSynced = false,
+                    DeviceId = IsPolling ? "ViPen" : "Manual"
                 };
 
                 var result = await _measurementRepository.SaveMeasurementAsync(measurement);
@@ -122,6 +154,11 @@ namespace DiagnosticNP.ViewModels
                         "Данные сохранены", "OK");
                     LatestMeasurement = measurement;
                 }
+                else
+                {
+                    await Application.Current.MainPage.DisplayAlert("Ошибка",
+                        "Не удалось сохранить данные", "OK");
+                }
             }
             catch (Exception ex)
             {
@@ -130,54 +167,124 @@ namespace DiagnosticNP.ViewModels
             }
         }
 
-        private async Task StartVibrometerMeasurementAsync()
+        public async Task StartPollingAsync()
         {
-            IsMeasuring = true;
+            if (string.IsNullOrEmpty(_deviceAddress))
+            {
+                await Application.Current.MainPage.DisplayAlert("Ошибка",
+                    "Виброметр не найден. Убедитесь, что устройство включено.", "OK");
+                return;
+            }
+
+            IsPolling = true;
+            ConnectionStatus = "Подключение...";
 
             try
             {
-                // Используем существующую реализацию Bluetooth для виброметра
-                using (var controller = VPenControlManager.GetController())
+                var token = new OperationToken();
+
+                // Автоматическое подключение к виброметру
+                System.Diagnostics.Debug.WriteLine("Автоподключение к виброметру...");
+                var connectSuccess = await _vipenController.ConnectAsync(_deviceAddress, token);
+
+                if (!connectSuccess)
+                {
+                    IsPolling = false;
+                    ConnectionStatus = "Ошибка подключения";
+                    await Application.Current.MainPage.DisplayAlert("Ошибка",
+                        "Не удалось подключиться к виброметру", "OK");
+                    return;
+                }
+
+                ConnectionStatus = "Подключено";
+
+                // Запускаем измерение на виброметре
+                await _vipenController.Start(_deviceAddress, token);
+
+                // Запускаем фоновый опрос
+                _pollingCancellationToken = new CancellationTokenSource();
+                Device.StartTimer(TimeSpan.FromMilliseconds(1000), () =>
+                {
+                    if (!IsPolling || _pollingCancellationToken.Token.IsCancellationRequested)
+                        return false;
+
+                    Task.Run(async () => await PollVibrometerData());
+                    return true;
+                });
+
+                await Application.Current.MainPage.DisplayAlert("Успех",
+                    "Опрос виброметра запущен", "OK");
+            }
+            catch (Exception ex)
+            {
+                IsPolling = false;
+                ConnectionStatus = "Ошибка подключения";
+                await Application.Current.MainPage.DisplayAlert("Ошибка",
+                    $"Ошибка запуска опроса: {ex.Message}", "OK");
+            }
+        }
+
+        public async Task StopPollingAsync()
+        {
+            try
+            {
+                IsPolling = false;
+                _pollingCancellationToken?.Cancel();
+
+                if (_vipenController.IsConnected)
                 {
                     var token = new OperationToken();
-
-                    // Здесь можно добавить логику для автоматического сбора данных с виброметра
-                    // и обновления полей Velocity, Temperature, Acceleration, Kurtosis
-
-                    // Временная заглушка - имитация данных с виброметра
-                    await SimulateVibrometerData(controller, token);
+                    await _vipenController.Stop(_deviceAddress, token);
+                    await _vipenController.Disconnect();
                 }
+
+                ConnectionStatus = "Не подключено";
+
+                await Application.Current.MainPage.DisplayAlert("Успех",
+                    "Опрос виброметра остановлен", "OK");
             }
             catch (Exception ex)
             {
                 await Application.Current.MainPage.DisplayAlert("Ошибка",
-                    $"Ошибка измерения: {ex.Message}", "OK");
-            }
-            finally
-            {
-                IsMeasuring = false;
+                    $"Ошибка остановки опроса: {ex.Message}", "OK");
             }
         }
 
-        private async Task StopVibrometerMeasurementAsync()
+        private async Task PollVibrometerData()
         {
-            IsMeasuring = false;
-            await SaveManualMeasurementAsync(); // Сохраняем данные после остановки
-        }
+            if (!_vipenController.IsConnected || !IsPolling)
+                return;
 
-        private async Task SimulateVibrometerData(IVPenControl controller, OperationToken token)
-        {
-            // Имитация сбора данных с виброметра
-            var random = new Random();
-
-            for (int i = 0; i < 10 && IsMeasuring; i++)
+            try
             {
-                Velocity = Math.Round(random.NextDouble() * 10, 2);
-                Temperature = Math.Round(20 + random.NextDouble() * 10, 2);
-                Acceleration = Math.Round(random.NextDouble() * 5, 2);
-                Kurtosis = Math.Round(random.NextDouble() * 3, 2);
+                var token = new OperationToken();
+                var data = await _vipenController.ReadUserData(_deviceAddress, token);
 
-                await Task.Delay(500);
+                // ОТЛАДОЧНАЯ ИНФОРМАЦИЯ - выведем сырые данные
+                System.Diagnostics.Debug.WriteLine($"Raw data from ViPen: V={data.Values[0]}, A={data.Values[1]}, K={data.Values[2]}, T={data.Values[3]}");
+
+                // Обновляем UI в основном потоке с ПРАВИЛЬНЫМ преобразованием данных
+                // Согласно исходному проекту, данные нужно преобразовывать как в MainViewModel
+                Device.BeginInvokeOnMainThread(() =>
+                {
+                    // ПРАВИЛЬНОЕ преобразование как в исходном проекте
+                    Velocity = Math.Round(data.Values[0] * 0.0001, 2);        // мм/с
+                    Acceleration = Math.Round(data.Values[1] * 0.0001, 2);    // м/с²
+                    Kurtosis = Math.Round(data.Values[2] * 0.01, 2);        // безразмерная величина
+                    Temperature = Math.Round(data.Values[3] * 0.01, 2);     // °C
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка опроса виброметра: {ex.Message}");
+
+                // При ошибке опроса автоматически останавливаем опрос
+                Device.BeginInvokeOnMainThread(async () =>
+                {
+                    await StopPollingAsync();
+                    await Application.Current.MainPage.DisplayAlert("Ошибка",
+                        "Ошибка опроса виброметра. Опрос остановлен.", "OK");
+                });
             }
         }
 
@@ -187,6 +294,24 @@ namespace DiagnosticNP.ViewModels
             Temperature = 0;
             Acceleration = 0;
             Kurtosis = 0;
+        }
+
+        public async void OnDisappearing()
+        {
+            try
+            {
+                // Останавливаем опрос при закрытии страницы
+                if (IsPolling)
+                {
+                    await StopPollingAsync();
+                }
+
+                _vipenController?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка при очистке ресурсов: {ex.Message}");
+            }
         }
     }
 }

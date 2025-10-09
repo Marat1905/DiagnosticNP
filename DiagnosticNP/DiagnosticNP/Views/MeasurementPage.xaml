@@ -11,6 +11,14 @@
             <Label Text="{Binding DirectionName}" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center"/>
             <Label Text="{Binding FullPath}" FontSize="12" TextColor="Gray" HorizontalOptions="Center"/>
 
+            <!-- Connection Status -->
+            <Frame BackgroundColor="{Binding ConnectionStatus, Converter={StaticResource StatusToColorConverter}}">
+                <StackLayout Orientation="Horizontal" HorizontalOptions="Center">
+                    <Label Text="Статус:" FontAttributes="Bold"/>
+                    <Label Text="{Binding ConnectionStatus}" Margin="10,0,0,0"/>
+                </StackLayout>
+            </Frame>
+
             <!-- Measurement Form -->
             <Frame BackgroundColor="White" BorderColor="LightGray">
                 <StackLayout Spacing="10">
@@ -41,87 +49,64 @@
                 </StackLayout>
             </Frame>
 
-            <!-- Common Save Button -->
-            <Button Text="Сохранить замер" 
-                    Command="{Binding SaveMeasurementCommand}"
-                    BackgroundColor="Blue"
-                    TextColor="White"
-                    FontSize="16"/>
+            <!-- Save and Clear Buttons -->
+            <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="10">
+                <Button Text="Сохранить замер" 
+                        Command="{Binding SaveMeasurementCommand}"
+                        BackgroundColor="Blue"
+                        TextColor="White"
+                        WidthRequest="150"/>
 
-            <!-- Manual Controls -->
-            <StackLayout Spacing="10">
-                <Label Text="Ручной ввод:" FontAttributes="Bold"/>
                 <Button Text="Очистить форму" 
                         Command="{Binding ClearFormCommand}"
                         BackgroundColor="Gray"
-                        TextColor="White"/>
+                        TextColor="White"
+                        WidthRequest="150"/>
             </StackLayout>
 
             <!-- Vibrometer Controls -->
-            <StackLayout Spacing="10">
-                <Label Text="Виброметр ViPen:" FontAttributes="Bold"/>
+            <Frame BackgroundColor="LightBlue" IsVisible="{Binding CanUseVibrometer}">
+                <StackLayout Spacing="10">
+                    <Label Text="Виброметр ViPen:" FontAttributes="Bold" HorizontalOptions="Center"/>
 
-                <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="10">
-                    <Button Text="Подключить" 
-                            Command="{Binding ConnectVibrometerCommand}"
-                            IsEnabled="{Binding IsVibrometerConnected, Converter={StaticResource InverseBooleanConverter}}"
-                            IsVisible="{Binding CanUseVibrometer}"
-                            BackgroundColor="Green"
-                            TextColor="White"/>
+                    <!-- КНОПКИ ОПРОСА -->
+                    <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="10">
+                        <Button Text="Запуск опроса" 
+                                Command="{Binding StartPollingCommand}"
+                                IsEnabled="{Binding IsPolling, Converter={StaticResource InverseBooleanConverter}}"
+                                BackgroundColor="DarkGreen"
+                                TextColor="White"
+                                WidthRequest="150"/>
 
-                    <Button Text="Отключить" 
-                            Command="{Binding DisconnectVibrometerCommand}"
-                            IsEnabled="{Binding IsVibrometerConnected}"
-                            IsVisible="{Binding CanUseVibrometer}"
-                            BackgroundColor="Red"
-                            TextColor="White"/>
+                        <Button Text="Остановка опроса" 
+                                Command="{Binding StopPollingCommand}"
+                                IsEnabled="{Binding IsPolling}"
+                                BackgroundColor="DarkRed"
+                                TextColor="White"
+                                WidthRequest="150"/>
+                    </StackLayout>
+
+                    <!-- Polling Indicator -->
+                    <ActivityIndicator IsVisible="{Binding IsPolling}"
+                                      IsRunning="{Binding IsPolling}"
+                                      HorizontalOptions="Center"/>
+                    <Label Text="Идет опрос виброметра..." 
+                           IsVisible="{Binding IsPolling}"
+                           HorizontalOptions="Center"
+                           TextColor="Green"/>
                 </StackLayout>
-
-                <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="10">
-                    <Button Text="Начать измерение" 
-                            Command="{Binding StartVibrometerMeasurementCommand}"
-                            IsEnabled="{Binding IsVibrometerConnected}"
-                            IsVisible="{Binding CanUseVibrometer}"
-                            BackgroundColor="DarkGreen"
-                            TextColor="White"/>
-
-                    <Button Text="Остановить" 
-                            Command="{Binding StopVibrometerMeasurementCommand}"
-                            IsEnabled="{Binding IsMeasuring}"
-                            IsVisible="{Binding CanUseVibrometer}"
-                            BackgroundColor="DarkRed"
-                            TextColor="White"/>
-                </StackLayout>
-
-                <Label Text="Виброметр недоступен" 
-                       IsVisible="{Binding CanUseVibrometer, Converter={StaticResource InverseBooleanConverter}}"
-                       TextColor="Orange"
-                       HorizontalOptions="Center"/>
-            </StackLayout>
-
-            <!-- Status Indicators -->
-            <StackLayout Spacing="5">
-                <Label Text="✓ Виброметр подключен" 
-                       IsVisible="{Binding IsVibrometerConnected}"
-                       TextColor="Green"
-                       HorizontalOptions="Center"/>
-
-                <Label Text="🔄 Идет измерение..." 
-                       IsVisible="{Binding IsMeasuring}"
-                       TextColor="Blue"
-                       HorizontalOptions="Center"/>
-            </StackLayout>
+            </Frame>
 
             <!-- Latest Measurement -->
             <Frame BackgroundColor="LightYellow" IsVisible="{Binding LatestMeasurement.HasData}">
                 <StackLayout>
                     <Label Text="Последний замер:" FontAttributes="Bold"/>
                     <Label Text="{Binding LatestMeasurement.MeasurementTime, StringFormat='Время: {0:dd.MM.yyyy HH:mm}'}"/>
-                    <Label Text="{Binding LatestMeasurement.Velocity, StringFormat='Скорость: {0} мм/с'}"/>
-                    <Label Text="{Binding LatestMeasurement.Temperature, StringFormat='Температура: {0} °C'}"/>
-                    <Label Text="{Binding LatestMeasurement.Acceleration, StringFormat='Ускорение: {0} м/с²'}"/>
-                    <Label Text="{Binding LatestMeasurement.Kurtosis, StringFormat='Куртозис: {0}'}"/>
-                    <Label Text="{Binding LatestMeasurement.IsManualEntry, StringFormat='Тип: {0}'}"/>
+                    <Label Text="{Binding LatestMeasurement.Velocity, StringFormat='Скорость: {0:F2} мм/с'}"/>
+                    <Label Text="{Binding LatestMeasurement.Temperature, StringFormat='Температура: {0:F2} °C'}"/>
+                    <Label Text="{Binding LatestMeasurement.Acceleration, StringFormat='Ускорение: {0:F2} м/с²'}"/>
+                    <Label Text="{Binding LatestMeasurement.Kurtosis, StringFormat='Куртозис: {0:F2}'}"/>
+                    <Label Text="{Binding LatestMeasurement.DeviceId, StringFormat='Устройство: {0}'}"/>
                 </StackLayout>
             </Frame>
         </StackLayout>

@@ -8,6 +8,7 @@
             <converters:DirectionTypeConverter x:Key="DirectionTypeConverter"/>
             <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
             <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
+            <converters:StatusToColorConverter x:Key="StatusToColorConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

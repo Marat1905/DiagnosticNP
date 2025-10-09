@@ -1,16 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows.Input;
-using DiagnosticNP.Data;
+﻿using DiagnosticNP.Data;
 using DiagnosticNP.Models;
+using DiagnosticNP.Models.Vibrometer;
 using DiagnosticNP.Services;
 using DiagnosticNP.Services.Bluetooth;
 using DiagnosticNP.Services.Nfc;
 using DiagnosticNP.Services.Utils;
 using DiagnosticNP.Views;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows.Input;
 using Xamarin.Forms;
 
 namespace DiagnosticNP.ViewModels
@@ -25,6 +26,15 @@ namespace DiagnosticNP.ViewModels
         private EquipmentNode _selectedNode;
         private string _nfcFilter;
         private bool _isLoading;
+        private string _vibrometerDevice;
+
+        // Данные виброметра
+        private DateTime _lastAdvertising;
+        private double _velocity;
+        private double _acceleration;
+        private double _kurtosis;
+        private double _temperature;
+        private bool _isPollingVibrometer;
 
         public MainViewModel()
         {
@@ -39,6 +49,7 @@ namespace DiagnosticNP.ViewModels
             InitializeCommands();
             LoadEquipmentStructure();
             InitializeNfc();
+            InitializeVibrometer();
         }
 
         public ObservableCollection<EquipmentNode> EquipmentNodes { get; }
@@ -76,17 +87,58 @@ namespace DiagnosticNP.ViewModels
 
         public bool IsDirectionSelected => SelectedNode?.Type == NodeType.Direction;
 
+        // Свойства виброметра
+        public DateTime LastAdvertising
+        {
+            get => _lastAdvertising;
+            set => SetProperty(ref _lastAdvertising, value);
+        }
+
+        public double Velocity
+        {
+            get => _velocity;
+            set => SetProperty(ref _velocity, value);
+        }
+
+        public double Acceleration
+        {
+            get => _acceleration;
+            set => SetProperty(ref _acceleration, value);
+        }
+
+        public double Kurtosis
+        {
+            get => _kurtosis;
+            set => SetProperty(ref _kurtosis, value);
+        }
+
+        public double Temperature
+        {
+            get => _temperature;
+            set => SetProperty(ref _temperature, value);
+        }
+
+        public bool IsPollingVibrometer
+        {
+            get => _isPollingVibrometer;
+            set
+            {
+                SetProperty(ref _isPollingVibrometer, value);
+                OnPropertyChanged(nameof(IsNotPollingVibrometer));
+            }
+        }
+
+        public bool IsNotPollingVibrometer => !IsPollingVibrometer;
+
         public ICommand LoadControlPointsCommand { get; private set; }
         public ICommand UploadDataCommand { get; private set; }
         public ICommand ClearDataCommand { get; private set; }
-        public ICommand ShowMeasurementPageCommand { get; private set; }
 
         private void InitializeCommands()
         {
             LoadControlPointsCommand = new Command(async () => await LoadControlPointsAsync());
             UploadDataCommand = new Command(async () => await UploadDataAsync());
             ClearDataCommand = new Command(async () => await ClearDataAsync());
-            ShowMeasurementPageCommand = new Command<EquipmentNode>(node => ShowMeasurementPage(node));
         }
 
         private async void LoadEquipmentStructure()
@@ -205,7 +257,7 @@ namespace DiagnosticNP.ViewModels
         {
             if (node?.Type == NodeType.Direction)
             {
-                var measurementVM = new MeasurementViewModel(node, _measurementRepository);
+                var measurementVM = new MeasurementViewModel(node, _measurementRepository, _vibrometerDevice);
                 var measurementPage = new MeasurementPage { BindingContext = measurementVM };
                 Application.Current.MainPage.Navigation.PushAsync(measurementPage);
             }
@@ -215,6 +267,43 @@ namespace DiagnosticNP.ViewModels
         {
             _nfcService.TagScanned += OnNfcTagScanned;
             _nfcService.StartListening();
+        }
+
+        private void InitializeVibrometer()
+        {
+            // Запуск сканирования BLE устройств
+            if (!BluetoothController.LeScanner.IsRunning)
+                BluetoothController.LeScanner.Restart();
+
+            BluetoothController.LeScanner.NewData += OnVibrometerDataReceived;
+        }
+
+        private void OnVibrometerDataReceived(object sender, BleDataEventArgs e)
+        {
+            Device.BeginInvokeOnMainThread(() => ProcessVibrometerData(e));
+        }
+
+        private void ProcessVibrometerData(BleDataEventArgs e)
+        {
+            try
+            {
+                _vibrometerDevice = e.Data.Address;
+
+                // Не обрабатываем advertising данные во время активного опроса
+                if (IsPollingVibrometer) return;
+
+                var data = e.Data.Data.BytesToStruct<ViPenAdvertising>();
+
+                Velocity = Math.Round(data.Velocity * 0.01, 2);
+                Acceleration = Math.Round(data.Acceleration * 0.01, 2);
+                Kurtosis = Math.Round(data.Kurtosis * 0.01, 2);
+                Temperature = Math.Round(data.Temperature * 0.01, 2);
+                LastAdvertising = DateTime.Now;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка обработки данных виброметра: {ex.Message}");
+            }
         }
 
         private void OnNfcTagScanned(object sender, string nfcData)
@@ -253,12 +342,14 @@ namespace DiagnosticNP.ViewModels
 
             foreach (var node in nodes)
             {
-                // Использование IndexOf для регистронезависимого поиска
-                if (node.FullPath.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (node?.FullPath == null)
+                    continue;
+
+                if (node.FullPath.ToLower().Contains(filter.ToLower()))
                 {
                     result.Add(node);
                 }
-                else if (node.Children.Any())
+                else if (node.Children?.Any() == true)
                 {
                     var childResults = FilterNodes(node.Children, filter);
                     if (childResults.Any())
@@ -277,6 +368,7 @@ namespace DiagnosticNP.ViewModels
         public void OnDisappearing()
         {
             _nfcService?.StopListening();
+            BluetoothController.LeScanner.NewData -= OnVibrometerDataReceived;
         }
     }
 }
