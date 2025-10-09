@@ -10,14 +10,14 @@ namespace DiagnosticNP.Converters
         {
             var status = value?.ToString() ?? "";
 
-            if (status == "Подключено")
-                return Color.LightGreen;
+            if (status == "Подключено" || status == "Подключение...")
+                return Color.FromHex("#27AE60"); // Success green
             else if (status == "Не подключено")
-                return Color.LightGray;
+                return Color.FromHex("#95A5A6"); // Gray
             else if (status == "Ошибка подключения")
-                return Color.LightPink;
+                return Color.FromHex("#E74C3C"); // Error red
             else
-                return Color.LightGray;
+                return Color.FromHex("#95A5A6"); // Default gray
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

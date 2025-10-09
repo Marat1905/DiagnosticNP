@@ -2,111 +2,209 @@
 <ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="DiagnosticNP.Views.MeasurementPage"
-             Title="Замер вибрации">
+             Title="Замер вибрации"
+             BackgroundColor="{StaticResource BackgroundColor}">
 
     <ScrollView>
-        <StackLayout Padding="20" Spacing="15">
+        <StackLayout Padding="20" Spacing="20">
 
-            <!-- Header -->
-            <Label Text="{Binding DirectionName}" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center"/>
-            <Label Text="{Binding FullPath}" FontSize="12" TextColor="Gray" HorizontalOptions="Center"/>
+            <!-- Header Section -->
+            <Frame Style="{StaticResource CardFrame}">
+                <StackLayout Spacing="8">
+                    <Label Text="{Binding DirectionName}" 
+                           Style="{StaticResource TitleLabel}"/>
+                    <Label Text="{Binding FullPath}" 
+                           Style="{StaticResource SubtitleLabel}"/>
+                </StackLayout>
+            </Frame>
 
-            <!-- Connection Status -->
-            <Frame BackgroundColor="{Binding ConnectionStatus, Converter={StaticResource StatusToColorConverter}}">
-                <StackLayout Orientation="Horizontal" HorizontalOptions="Center">
-                    <Label Text="Статус:" FontAttributes="Bold"/>
-                    <Label Text="{Binding ConnectionStatus}" Margin="10,0,0,0"/>
+            <!-- Status Card -->
+            <Frame Style="{StaticResource CardFrame}">
+                <StackLayout Spacing="10">
+                    <Label Text="Статус подключения" 
+                           FontAttributes="Bold" 
+                           FontSize="16"
+                           TextColor="{StaticResource TextPrimary}"/>
+
+                    <Frame BackgroundColor="{Binding ConnectionStatus, Converter={StaticResource StatusToColorConverter}}"
+                           CornerRadius="8" Padding="15,10" HasShadow="False">
+                        <StackLayout Orientation="Horizontal" Spacing="10">
+                            <Label Text="📶" FontSize="16" VerticalOptions="Center"/>
+                            <Label Text="{Binding ConnectionStatus}" 
+                                   TextColor="White" 
+                                   FontAttributes="Bold"
+                                   VerticalOptions="Center"
+                                   HorizontalOptions="StartAndExpand"/>
+                        </StackLayout>
+                    </Frame>
                 </StackLayout>
             </Frame>
 
             <!-- Measurement Form -->
-            <Frame BackgroundColor="White" BorderColor="LightGray">
-                <StackLayout Spacing="10">
-                    <Label Text="Параметры замера:" FontAttributes="Bold"/>
+            <Frame Style="{StaticResource CardFrame}">
+                <StackLayout Spacing="15">
+                    <Label Text="Параметры замера" 
+                           FontAttributes="Bold" 
+                           FontSize="16"
+                           TextColor="{StaticResource TextPrimary}"/>
 
-                    <StackLayout Orientation="Horizontal">
-                        <Label Text="Скорость вибрации:" VerticalOptions="Center"/>
-                        <Entry Text="{Binding Velocity}" Keyboard="Numeric" HorizontalOptions="FillAndExpand"/>
-                        <Label Text="мм/с" VerticalOptions="Center"/>
+                    <!-- Velocity -->
+                    <StackLayout Spacing="5">
+                        <Label Text="Скорость вибрации" 
+                               FontSize="14" 
+                               TextColor="{StaticResource TextSecondary}"/>
+                        <StackLayout Orientation="Horizontal" Spacing="10">
+                            <Entry Text="{Binding Velocity}" 
+                                   Keyboard="Numeric" 
+                                   Style="{StaticResource FormEntry}"
+                                   HorizontalOptions="FillAndExpand"
+                                   Placeholder="0.00"/>
+                            <Label Text="мм/с" 
+                                   VerticalOptions="Center" 
+                                   TextColor="{StaticResource TextSecondary}"
+                                   FontSize="14"/>
+                        </StackLayout>
                     </StackLayout>
 
-                    <StackLayout Orientation="Horizontal">
-                        <Label Text="Температура:" VerticalOptions="Center"/>
-                        <Entry Text="{Binding Temperature}" Keyboard="Numeric" HorizontalOptions="FillAndExpand"/>
-                        <Label Text="°C" VerticalOptions="Center"/>
+                    <!-- Temperature -->
+                    <StackLayout Spacing="5">
+                        <Label Text="Температура" 
+                               FontSize="14" 
+                               TextColor="{StaticResource TextSecondary}"/>
+                        <StackLayout Orientation="Horizontal" Spacing="10">
+                            <Entry Text="{Binding Temperature}" 
+                                   Keyboard="Numeric" 
+                                   Style="{StaticResource FormEntry}"
+                                   HorizontalOptions="FillAndExpand"
+                                   Placeholder="0.00"/>
+                            <Label Text="°C" 
+                                   VerticalOptions="Center" 
+                                   TextColor="{StaticResource TextSecondary}"
+                                   FontSize="14"/>
+                        </StackLayout>
                     </StackLayout>
 
-                    <StackLayout Orientation="Horizontal">
-                        <Label Text="Ускорение:" VerticalOptions="Center"/>
-                        <Entry Text="{Binding Acceleration}" Keyboard="Numeric" HorizontalOptions="FillAndExpand"/>
-                        <Label Text="м/с²" VerticalOptions="Center"/>
+                    <!-- Acceleration -->
+                    <StackLayout Spacing="5">
+                        <Label Text="Ускорение" 
+                               FontSize="14" 
+                               TextColor="{StaticResource TextSecondary}"/>
+                        <StackLayout Orientation="Horizontal" Spacing="10">
+                            <Entry Text="{Binding Acceleration}" 
+                                   Keyboard="Numeric" 
+                                   Style="{StaticResource FormEntry}"
+                                   HorizontalOptions="FillAndExpand"
+                                   Placeholder="0.00"/>
+                            <Label Text="м/с²" 
+                                   VerticalOptions="Center" 
+                                   TextColor="{StaticResource TextSecondary}"
+                                   FontSize="14"/>
+                        </StackLayout>
                     </StackLayout>
 
-                    <StackLayout Orientation="Horizontal">
-                        <Label Text="Куртозис:" VerticalOptions="Center"/>
-                        <Entry Text="{Binding Kurtosis}" Keyboard="Numeric" HorizontalOptions="FillAndExpand"/>
+                    <!-- Kurtosis -->
+                    <StackLayout Spacing="5">
+                        <Label Text="Куртозис" 
+                               FontSize="14" 
+                               TextColor="{StaticResource TextSecondary}"/>
+                        <Entry Text="{Binding Kurtosis}" 
+                               Keyboard="Numeric" 
+                               Style="{StaticResource FormEntry}"
+                               Placeholder="0.00"/>
                     </StackLayout>
                 </StackLayout>
             </Frame>
 
-            <!-- Save and Clear Buttons -->
-            <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="10">
-                <Button Text="Сохранить замер" 
-                        Command="{Binding SaveMeasurementCommand}"
-                        BackgroundColor="Blue"
-                        TextColor="White"
-                        WidthRequest="150"/>
+            <!-- Action Buttons -->
+            <Frame Style="{StaticResource CardFrame}">
+                <StackLayout Spacing="12">
+                    <Button Text="💾 Сохранить замер" 
+                            Command="{Binding SaveMeasurementCommand}"
+                            Style="{StaticResource SuccessButton}"/>
 
-                <Button Text="Очистить форму" 
-                        Command="{Binding ClearFormCommand}"
-                        BackgroundColor="Gray"
-                        TextColor="White"
-                        WidthRequest="150"/>
-            </StackLayout>
+                    <Button Text="🗑️ Очистить форму" 
+                            Command="{Binding ClearFormCommand}"
+                            Style="{StaticResource OutlineButton}"/>
+                </StackLayout>
+            </Frame>
 
             <!-- Vibrometer Controls -->
-            <Frame BackgroundColor="LightBlue" IsVisible="{Binding CanUseVibrometer}">
-                <StackLayout Spacing="10">
-                    <Label Text="Виброметр ViPen:" FontAttributes="Bold" HorizontalOptions="Center"/>
+            <Frame Style="{StaticResource CardFrame}" IsVisible="{Binding CanUseVibrometer}">
+                <StackLayout Spacing="15">
+                    <Label Text="🔧 Управление виброметром" 
+                           FontAttributes="Bold" 
+                           FontSize="16"
+                           TextColor="{StaticResource TextPrimary}"/>
 
-                    <!-- КНОПКИ ОПРОСА -->
-                    <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="10">
-                        <Button Text="Запуск опроса" 
+                    <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="15">
+                        <Button Text="▶️ Запуск опроса" 
                                 Command="{Binding StartPollingCommand}"
                                 IsEnabled="{Binding IsPolling, Converter={StaticResource InverseBooleanConverter}}"
-                                BackgroundColor="DarkGreen"
-                                TextColor="White"
+                                Style="{StaticResource PrimaryButton}"
                                 WidthRequest="150"/>
 
-                        <Button Text="Остановка опроса" 
+                        <Button Text="⏹️ Остановка опроса" 
                                 Command="{Binding StopPollingCommand}"
                                 IsEnabled="{Binding IsPolling}"
-                                BackgroundColor="DarkRed"
-                                TextColor="White"
+                                Style="{StaticResource DangerButton}"
                                 WidthRequest="150"/>
                     </StackLayout>
 
                     <!-- Polling Indicator -->
-                    <ActivityIndicator IsVisible="{Binding IsPolling}"
-                                      IsRunning="{Binding IsPolling}"
-                                      HorizontalOptions="Center"/>
-                    <Label Text="Идет опрос виброметра..." 
-                           IsVisible="{Binding IsPolling}"
-                           HorizontalOptions="Center"
-                           TextColor="Green"/>
+                    <StackLayout Spacing="10" IsVisible="{Binding IsPolling}">
+                        <ActivityIndicator IsRunning="True" 
+                                         Color="{StaticResource PrimaryColor}"
+                                         HorizontalOptions="Center"
+                                         HeightRequest="30" 
+                                         WidthRequest="30"/>
+                        <Label Text="Идет опрос виброметра..." 
+                               HorizontalOptions="Center"
+                               TextColor="{StaticResource SuccessColor}"
+                               FontAttributes="Italic"/>
+                    </StackLayout>
                 </StackLayout>
             </Frame>
 
             <!-- Latest Measurement -->
-            <Frame BackgroundColor="LightYellow" IsVisible="{Binding LatestMeasurement.HasData}">
-                <StackLayout>
-                    <Label Text="Последний замер:" FontAttributes="Bold"/>
-                    <Label Text="{Binding LatestMeasurement.MeasurementTime, StringFormat='Время: {0:dd.MM.yyyy HH:mm}'}"/>
-                    <Label Text="{Binding LatestMeasurement.Velocity, StringFormat='Скорость: {0:F2} мм/с'}"/>
-                    <Label Text="{Binding LatestMeasurement.Temperature, StringFormat='Температура: {0:F2} °C'}"/>
-                    <Label Text="{Binding LatestMeasurement.Acceleration, StringFormat='Ускорение: {0:F2} м/с²'}"/>
-                    <Label Text="{Binding LatestMeasurement.Kurtosis, StringFormat='Куртозис: {0:F2}'}"/>
-                    <Label Text="{Binding LatestMeasurement.DeviceId, StringFormat='Устройство: {0}'}"/>
+            <Frame Style="{StaticResource CardFrame}" IsVisible="{Binding LatestMeasurement.HasData}">
+                <StackLayout Spacing="12">
+                    <Label Text="📈 Последний замер" 
+                           FontAttributes="Bold" 
+                           FontSize="16"
+                           TextColor="{StaticResource TextPrimary}"/>
+
+                    <Grid ColumnSpacing="10" RowSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Label Grid.Row="0" Grid.Column="0" Text="Время:" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Grid.Row="0" Grid.Column="1" Text="{Binding LatestMeasurement.MeasurementTime, StringFormat='{0:dd.MM.yyyy HH:mm}'}" FontAttributes="Bold"/>
+
+                        <Label Grid.Row="1" Grid.Column="0" Text="Скорость:" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Grid.Row="1" Grid.Column="1" Text="{Binding LatestMeasurement.Velocity, StringFormat='{0:F2} мм/с'}" FontAttributes="Bold"/>
+
+                        <Label Grid.Row="2" Grid.Column="0" Text="Температура:" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Grid.Row="2" Grid.Column="1" Text="{Binding LatestMeasurement.Temperature, StringFormat='{0:F2} °C'}" FontAttributes="Bold"/>
+
+                        <Label Grid.Row="3" Grid.Column="0" Text="Ускорение:" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Grid.Row="3" Grid.Column="1" Text="{Binding LatestMeasurement.Acceleration, StringFormat='{0:F2} м/с²'}" FontAttributes="Bold"/>
+
+                        <Label Grid.Row="4" Grid.Column="0" Text="Куртозис:" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Grid.Row="4" Grid.Column="1" Text="{Binding LatestMeasurement.Kurtosis, StringFormat='{0:F2}'}" FontAttributes="Bold"/>
+
+                        <Label Grid.Row="5" Grid.Column="0" Text="Устройство:" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Grid.Row="5" Grid.Column="1" Text="{Binding LatestMeasurement.DeviceId}" FontAttributes="Bold"/>
+                    </Grid>
                 </StackLayout>
             </Frame>
         </StackLayout>
