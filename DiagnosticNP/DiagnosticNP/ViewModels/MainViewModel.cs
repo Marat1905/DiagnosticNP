@@ -111,7 +111,6 @@ namespace DiagnosticNP.ViewModels
         public ICommand StartListeningCommand { get; private set; }
         public ICommand StopListeningCommand { get; private set; }
         public ICommand ReadTagCommand { get; private set; }
-        public ICommand StartVibrometerCommand { get; private set; }
         public ICommand StopVibrometerCommand { get; private set; }
         public ICommand PollVibrometerCommand { get; private set; }
         public ICommand ConnectVibrometerCommand { get; private set; }
@@ -125,7 +124,6 @@ namespace DiagnosticNP.ViewModels
             ReadTagCommand = new Command(async () => await ReadTag());
 
             // Команды виброметра
-            StartVibrometerCommand = new Command(async () => await StartVibrometerMeasurement());
             StopVibrometerCommand = new Command(StopVibrometer);
             PollVibrometerCommand = new Command(async () => await PollVibrometer());
             ConnectVibrometerCommand = new Command(async () => await ConnectVibrometer());
@@ -248,44 +246,6 @@ namespace DiagnosticNP.ViewModels
             }
         }
 
-        private async Task StartVibrometerMeasurement()
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(_vibrometerDevice))
-                {
-                    await Application.Current.MainPage.DisplayAlert("Ошибка",
-                        "Сначала подключитесь к виброметру", "OK");
-                    return;
-                }
-
-                IsBusy = true;
-
-                using (var controller = VPenControlManager.GetController())
-                {
-                    var token = new OperationToken();
-                    if (await controller.StartMeasurementAsync(_vibrometerDevice, token))
-                    {
-                        await Application.Current.MainPage.DisplayAlert("Успех",
-                            "Измерение виброметром запущено", "OK");
-                    }
-                    else
-                    {
-                        await Application.Current.MainPage.DisplayAlert("Ошибка",
-                            "Не удалось запустить измерение", "OK");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                await Application.Current.MainPage.DisplayAlert("Ошибка",
-                    $"Ошибка запуска измерения: {ex.Message}", "OK");
-            }
-            finally
-            {
-                IsBusy = false;
-            }
-        }
 
         private async Task PollVibrometer()
         {

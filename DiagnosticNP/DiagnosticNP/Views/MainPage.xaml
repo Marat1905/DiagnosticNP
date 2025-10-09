@@ -63,12 +63,6 @@
                    BackgroundColor="LightBlue" 
                    Padding="10"/>
 
-            <Button Text="Подключить виброметр" 
-                    Command="{Binding StartVibrometerCommand}"
-                    BackgroundColor="DarkOrange"
-                    TextColor="White"
-                    Margin="0,20,0,0"/>
-
             <Button Text="Запуск опроса виброметра" 
                     Command="{Binding PollVibrometerCommand}"
                     IsEnabled="{Binding IsNotPollingVibrometer}"
