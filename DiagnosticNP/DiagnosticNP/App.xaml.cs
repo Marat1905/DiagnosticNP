@@ -1,4 +1,5 @@
 ﻿using DiagnosticNP.Views;
+using Syncfusion.Licensing;
 using Xamarin.Forms;
 
 namespace DiagnosticNP
@@ -9,7 +10,10 @@ namespace DiagnosticNP
         {
             InitializeComponent();
 
-            MainPage = new MainPage();
+            // Регистрация лицензии Syncfusion
+            SyncfusionLicenseProvider.RegisterLicense("Njc4NTkxQDMyMzAyZTMyMmUzMFdGQkpoWWhnZEsrNUc1amo1b1R1eXF6TXVlNm8vRzA4RHQzZGI5Umd6ZlU9");
+
+            MainPage = new NavigationPage(new MainPage());
         }
 
         protected override void OnStart()

@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:DiagnosticNP.ViewModels"
+             x:Class="DiagnosticNP.Views.MeasurementPage"
+             Title="Замер вибрации">
+
+
+    <ScrollView>
+        <StackLayout Padding="20" Spacing="15">
+            <Label Text="{Binding ControlPoint.FullPath}" 
+                   FontSize="16" 
+                   FontAttributes="Bold"
+                   TextColor="#2196F3"/>
+
+            <Label Text="{Binding ControlPoint.MeasurementType, StringFormat='Тип замера: {0}'}" 
+                   FontSize="14"/>
+
+            <!-- Поля для ввода данных -->
+            <Frame BackgroundColor="#f9f9f9" Padding="15">
+                <StackLayout Spacing="10">
+                    <Label Text="Данные замера:" FontAttributes="Bold"/>
+
+                    <StackLayout>
+                        <Label Text="Скорость вибрации (мм/с):"/>
+                        <Entry Text="{Binding Measurement.Velocity}" 
+                               Keyboard="Numeric"
+                               Placeholder="0.0"/>
+                    </StackLayout>
+
+                    <StackLayout>
+                        <Label Text="Температура (°C):"/>
+                        <Entry Text="{Binding Measurement.Temperature}" 
+                               Keyboard="Numeric"
+                               Placeholder="0.0"/>
+                    </StackLayout>
+
+                    <StackLayout>
+                        <Label Text="Ускорение (м/с²):"/>
+                        <Entry Text="{Binding Measurement.Acceleration}" 
+                               Keyboard="Numeric"
+                               Placeholder="0.0"/>
+                    </StackLayout>
+
+                    <StackLayout>
+                        <Label Text="Куртозис:"/>
+                        <Entry Text="{Binding Measurement.Kurtosis}" 
+                               Keyboard="Numeric"
+                               Placeholder="0.0"/>
+                    </StackLayout>
+                </StackLayout>
+            </Frame>
+
+            <!-- Кнопки управления -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0"
+                        Text="Автозамер"
+                        Command="{Binding AutoMeasureCommand}"
+                        BackgroundColor="#FF9800"
+                        TextColor="White"
+                        Margin="0,0,5,0"/>
+
+                <Button Grid.Column="1"
+                        Text="Сохранить"
+                        Command="{Binding SaveMeasurementCommand}"
+                        BackgroundColor="#4CAF50"
+                        TextColor="White"
+                        Margin="5,0,5,0"/>
+
+                <Button Grid.Column="2"
+                        Text="Отмена"
+                        Command="{Binding CancelCommand}"
+                        BackgroundColor="#9E9E9E"
+                        TextColor="White"
+                        Margin="5,0,0,0"/>
+            </Grid>
+
+            <!-- Индикатор загрузки -->
+            <ActivityIndicator IsVisible="{Binding IsBusy}"
+                             IsRunning="{Binding IsBusy}"
+                             Color="#2196F3"/>
+        </StackLayout>
+    </ScrollView>
+</ContentPage>
