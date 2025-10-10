@@ -104,7 +104,7 @@ namespace DiagnosticNP.ViewModels
         {
             LoadEquipmentCommand = new Command(async () => await LoadEquipmentStructureFromApi());
             UploadMeasurementsCommand = new Command(async () => await UploadMeasurements());
-            TakeMeasurementCommand = new Command(async () => await TakeMeasurement());
+            TakeMeasurementCommand = new Command<EquipmentNode>(async (node) => await TakeMeasurement(node));
             ClearMeasurementsCommand = new Command(async () => await ClearMeasurements());
             ExpandAllCommand = new Command(() => ExpandAll = true);
             CollapseAllCommand = new Command(() => CollapseAll = true);
@@ -247,23 +247,25 @@ namespace DiagnosticNP.ViewModels
             }
         }
 
-        private async Task TakeMeasurement()
+        private async Task TakeMeasurement(EquipmentNode node = null)
         {
-            if (SelectedNode == null)
+            var targetNode = node ?? SelectedNode;
+
+            if (targetNode == null)
             {
                 await Application.Current.MainPage.DisplayAlert("Внимание",
                     "Выберите точку замера в дереве оборудования", "OK");
                 return;
             }
 
-            if (!IsMeasurementPoint(SelectedNode))
+            if (!IsMeasurementPoint(targetNode))
             {
                 await Application.Current.MainPage.DisplayAlert("Внимание",
                     "Выберите конкретную точку замера (Горизонтальная, Вертикальная, Осевая)", "OK");
                 return;
             }
 
-            var measurementVm = new MeasurementViewModel(SelectedNode, _repository);
+            var measurementVm = new MeasurementViewModel(targetNode, _repository);
             await Application.Current.MainPage.Navigation.PushAsync(new MeasurementPage(measurementVm));
         }
 
