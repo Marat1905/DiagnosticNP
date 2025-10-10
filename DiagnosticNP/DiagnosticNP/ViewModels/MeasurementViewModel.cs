@@ -44,25 +44,41 @@ namespace DiagnosticNP.ViewModels
         public double Velocity
         {
             get => _velocity;
-            set => SetProperty(ref _velocity, value);
+            set
+            {
+                System.Diagnostics.Debug.WriteLine($"Setting Velocity: {value}");
+                SetProperty(ref _velocity, value);
+            }
         }
 
         public double Temperature
         {
             get => _temperature;
-            set => SetProperty(ref _temperature, value);
+            set
+            {
+                System.Diagnostics.Debug.WriteLine($"Setting Temperature: {value}");
+                SetProperty(ref _temperature, value);
+            }
         }
 
         public double Acceleration
         {
             get => _acceleration;
-            set => SetProperty(ref _acceleration, value);
+            set
+            {
+                System.Diagnostics.Debug.WriteLine($"Setting Acceleration: {value}");
+                SetProperty(ref _acceleration, value);
+            }
         }
 
         public double Kurtosis
         {
             get => _kurtosis;
-            set => SetProperty(ref _kurtosis, value);
+            set
+            {
+                System.Diagnostics.Debug.WriteLine($"Setting Kurtosis: {value}");
+                SetProperty(ref _kurtosis, value);
+            }
         }
 
         public DateTime MeasurementTime
@@ -145,7 +161,6 @@ namespace DiagnosticNP.ViewModels
             Device.BeginInvokeOnMainThread(() =>
             {
                 VibrometerStatus = $"Ошибка: {error}";
-                // Можно показать диалог с ошибкой, если нужно
                 System.Diagnostics.Debug.WriteLine($"VibrometerService Error: {error}");
             });
         }
@@ -157,8 +172,9 @@ namespace DiagnosticNP.ViewModels
 
         private void UpdateFromVibrometerData(VibrometerData data)
         {
-            var t = data.Velocity;
-            Velocity1 = data.Velocity;
+            System.Diagnostics.Debug.WriteLine($"UpdateFromVibrometerData - Velocity: {data.Velocity}, Type: {data.Velocity.GetType()}");
+
+            Velocity = data.Velocity;
             Acceleration = data.Acceleration;
             Kurtosis = data.Kurtosis;
             Temperature = data.Temperature;
@@ -166,6 +182,8 @@ namespace DiagnosticNP.ViewModels
 
             // Автоматически обновляем время замера при получении новых данных
             MeasurementTime = DateTime.Now;
+
+            System.Diagnostics.Debug.WriteLine($"After assignment - Velocity: {_velocity}");
         }
 
         private async Task ReadFromVibrometer()
@@ -252,7 +270,7 @@ namespace DiagnosticNP.ViewModels
                 {
                     EquipmentNodeId = _equipmentNode.Id,
                     MeasurementType = MeasurementType,
-                    Velocity = Velocity1,
+                    Velocity = Velocity,
                     Temperature = Temperature,
                     Acceleration = Acceleration,
                     Kurtosis = Kurtosis,
@@ -277,7 +295,7 @@ namespace DiagnosticNP.ViewModels
 
         private bool ValidateMeasurement()
         {
-            if (Velocity1 < 0)
+            if (Velocity < 0)
             {
                 Application.Current.MainPage.DisplayAlert("Ошибка", "Скорость не может быть отрицательной", "OK");
                 return false;
