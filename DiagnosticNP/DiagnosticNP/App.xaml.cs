@@ -9,6 +9,8 @@ namespace DiagnosticNP
         {
             InitializeComponent();
 
+            Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense("Njc4NTkxQDMyMzAyZTMyMmUzMFdGQkpoWWhnZEsrNUc1amo1b1R1eXF6TXVlNm8vRzA4RHQzZGI5Umd6ZlU9");
+
             MainPage = new MainPage();
         }
 
