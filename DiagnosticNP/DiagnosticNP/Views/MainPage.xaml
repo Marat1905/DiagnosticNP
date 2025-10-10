@@ -20,16 +20,20 @@
             <!-- Добавим конвертер для проверки типа точки замера -->
             <converters:IsMeasurementPointConverter x:Key="IsMeasurementPointConverter"/>
 
-            <!-- Стиль для кнопки замера в дереве -->
+            <!-- УЛУЧШЕННЫЙ стиль для кнопки замера в дереве - БОЛЬШАЯ ИКОНКА -->
             <Style TargetType="Button" x:Key="MeasurementPointButton">
                 <Setter Property="BackgroundColor" Value="#38B000"/>
                 <Setter Property="TextColor" Value="White"/>
-                <Setter Property="CornerRadius" Value="8"/>
-                <Setter Property="HeightRequest" Value="32"/>
-                <Setter Property="WidthRequest" Value="80"/>
-                <Setter Property="FontSize" Value="11"/>
+                <Setter Property="CornerRadius" Value="20"/>
+                <!-- Круглая кнопка -->
+                <Setter Property="HeightRequest" Value="40"/>
+                <Setter Property="WidthRequest" Value="40"/>
+                <!-- Квадратная кнопка -->
+                <Setter Property="FontSize" Value="12"/>
+                <!-- Увеличиваем размер эмодзи -->
                 <Setter Property="FontAttributes" Value="Bold"/>
-                <Setter Property="Margin" Value="8,0,0,0"/>
+                <Setter Property="Margin" Value="10,0,0,0"/>
+                <Setter Property="Padding" Value="0"/>
             </Style>
 
             <!-- Стили для кнопок -->
@@ -38,7 +42,7 @@
                 <Setter Property="TextColor" Value="White"/>
                 <Setter Property="CornerRadius" Value="8"/>
                 <Setter Property="HeightRequest" Value="36"/>
-                <Setter Property="FontSize" Value="11"/>
+                <Setter Property="FontSize" Value="14"/>
                 <Setter Property="Padding" Value="8,0"/>
             </Style>
 
@@ -47,7 +51,7 @@
                 <Setter Property="TextColor" Value="White"/>
                 <Setter Property="CornerRadius" Value="8"/>
                 <Setter Property="HeightRequest" Value="36"/>
-                <Setter Property="FontSize" Value="11"/>
+                <Setter Property="FontSize" Value="14"/>
                 <Setter Property="Padding" Value="6,0"/>
                 <Setter Property="FontAttributes" Value="Bold"/>
             </Style>
@@ -57,150 +61,172 @@
                 <Setter Property="TextColor" Value="White"/>
                 <Setter Property="CornerRadius" Value="8"/>
                 <Setter Property="HeightRequest" Value="36"/>
-                <Setter Property="FontSize" Value="11"/>
+                <Setter Property="FontSize" Value="14"/>
                 <Setter Property="Padding" Value="6,0"/>
             </Style>
         </ResourceDictionary>
     </ContentPage.Resources>
 
-    <ScrollView>
-        <StackLayout Spacing="0">
-            <!-- Статусная панель -->
-            <Frame BackgroundColor="#4361EE" Padding="10" Margin="8">
-                <Label Text="{Binding StatusMessage}" 
-                       FontSize="13" 
-                       TextColor="White"
-                       HorizontalTextAlignment="Center"
-                       FontAttributes="Bold"
-                       LineBreakMode="TailTruncation"/>
-            </Frame>
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" 
+          RowSpacing="0" 
+          Margin="0"
+          VerticalOptions="FillAndExpand">
 
-            <!-- Панель поиска -->
-            <Frame BackgroundColor="White" Padding="10">
-                <Grid ColumnSpacing="6">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+        <!-- Статусная панель -->
+        <Frame Grid.Row="0" 
+               BackgroundColor="#4361EE" 
+               Padding="10" 
+               Margin="8">
+            <Label Text="{Binding StatusMessage}" 
+                   FontSize="13" 
+                   TextColor="White"
+                   HorizontalTextAlignment="Center"
+                   FontAttributes="Bold"
+                   LineBreakMode="TailTruncation"/>
+        </Frame>
 
-                    <Entry Grid.Column="0" 
-                           Placeholder="🔍 Поиск по оборудованию..." 
-                           Text="{Binding SearchText}"
-                           BackgroundColor="#F8F9FA"
-                           HeightRequest="38"
-                           FontSize="13"/>
+        <!-- Панель поиска -->
+        <Frame Grid.Row="1" 
+               BackgroundColor="White" 
+               Padding="10">
+            <Grid ColumnSpacing="6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-                    <Button Grid.Column="1" 
-                            Text="🔄" 
-                            Command="{Binding LoadEquipmentCommand}"
-                            Style="{StaticResource SecondaryButton}"
-                            WidthRequest="38"/>
-                </Grid>
-            </Frame>
+                <Entry Grid.Column="0" 
+                       Placeholder="🔍 Поиск по оборудованию..." 
+                       Text="{Binding SearchText}"
+                       BackgroundColor="#F8F9FA"
+                       HeightRequest="38"
+                       FontSize="13"/>
 
-            <!-- Панель управления - ОДНА СТРОКА -->
-            <Frame BackgroundColor="White" Padding="8">
-                <Grid ColumnSpacing="4">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+                <Button Grid.Column="1" 
+                        Text="🔄" 
+                        Command="{Binding LoadEquipmentCommand}"
+                        Style="{StaticResource SecondaryButton}"
+                        WidthRequest="38"/>
+            </Grid>
+        </Frame>
 
-                    <!-- Основные действия -->
-                    <Button Grid.Column="0" 
-                            Text="📥 Загр" 
-                            Command="{Binding LoadEquipmentCommand}"
-                            Style="{StaticResource CompactButton}"/>
+        <!-- Панель управления - ТОЛЬКО ОСНОВНЫЕ КНОПКИ -->
+        <Frame Grid.Row="2" 
+               BackgroundColor="White" 
+               Padding="8">
+            <Grid ColumnSpacing="4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-                    <Button Grid.Column="1" 
-                            Text="📤 Выгр" 
-                            Command="{Binding UploadMeasurementsCommand}"
-                            Style="{StaticResource CompactButton}"/>
+                <!-- Основные действия -->
+                <Button Grid.Column="0" 
+                        Text="📥 Загр" 
+                        Command="{Binding LoadEquipmentCommand}"
+                        Style="{StaticResource CompactButton}"/>
 
-                    <Button Grid.Column="2" 
-                            Text="🗑️ Очист" 
-                            Command="{Binding ClearMeasurementsCommand}"
-                            Style="{StaticResource DangerButton}"/>
+                <Button Grid.Column="1" 
+                        Text="📤 Выгр" 
+                        Command="{Binding UploadMeasurementsCommand}"
+                        Style="{StaticResource CompactButton}"/>
 
-                    <!-- Управление деревом -->
-                    <Button Grid.Column="3" 
-                            Text="📂" 
-                            Command="{Binding ExpandAllCommand}"
-                            Style="{StaticResource SecondaryButton}"
-                            WidthRequest="40"/>
+                <Button Grid.Column="2" 
+                        Text="🗑️ Очист" 
+                        Command="{Binding ClearMeasurementsCommand}"
+                        Style="{StaticResource DangerButton}"/>
+            </Grid>
+        </Frame>
 
-                    <Button Grid.Column="4" 
-                            Text="📁" 
-                            Command="{Binding CollapseAllCommand}"
-                            Style="{StaticResource SecondaryButton}"
-                            WidthRequest="40"/>
-                </Grid>
-            </Frame>
+        <!-- Дерево оборудования - ЗАНИМАЕТ ВСЕ ОСТАВШЕЕСЯ ПРОСТРАНСТВО -->
+        <Frame Grid.Row="3" 
+               BackgroundColor="White" 
+               Padding="0" 
+               HasShadow="True" 
+               Margin="8"
+               VerticalOptions="FillAndExpand">
+            <Grid>
+                <sfTreeView:SfTreeView 
+                    x:Name="treeView"
+                    ItemsSource="{Binding EquipmentNodes}"
+                    NotificationSubscriptionMode="CollectionChange"
+                    ChildPropertyName="Children"
+                    AutoExpandMode="None"
+                    SelectionMode="Single"
+                    SelectedItem="{Binding SelectedNode}"
+                    Indentation="20"
+                    ExpanderWidth="40"
+                    BackgroundColor="Transparent">
 
-            <!-- Дерево оборудования -->
-            <Frame BackgroundColor="White" Padding="0" HasShadow="True" Margin="8">
-                <Grid>
-                    <sfTreeView:SfTreeView 
-                        x:Name="treeView"
-                        ItemsSource="{Binding EquipmentNodes}"
-                        NotificationSubscriptionMode="CollectionChange"
-                        ChildPropertyName="Children"
-                        AutoExpandMode="None"
-                        SelectionMode="Single"
-                        SelectedItem="{Binding SelectedNode}"
-                        Indentation="20"
-                        ExpanderWidth="35"
-                        BackgroundColor="Transparent">
+                    <sfTreeView:SfTreeView.Behaviors>
+                        <behaviors:TreeViewBehavior 
+                            ExpandAll="{Binding ExpandAll, Mode=TwoWay}"
+                            CollapseAll="{Binding CollapseAll, Mode=TwoWay}"
+                            ExpandToNode="{Binding NodeToExpand, Mode=TwoWay}"/>
+                    </sfTreeView:SfTreeView.Behaviors>
 
-                        <sfTreeView:SfTreeView.Behaviors>
-                            <behaviors:TreeViewBehavior 
-                                ExpandAll="{Binding ExpandAll, Mode=TwoWay}"
-                                CollapseAll="{Binding CollapseAll, Mode=TwoWay}"
-                                ExpandToNode="{Binding NodeToExpand, Mode=TwoWay}"/>
-                        </sfTreeView:SfTreeView.Behaviors>
+                    <sfTreeView:SfTreeView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Padding="10,6" BackgroundColor="Transparent">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
 
-                        <sfTreeView:SfTreeView.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Padding="10,6" BackgroundColor="Transparent">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
+                                <Label Grid.Column="0" 
+                                       Text="{Binding Name}" 
+                                       VerticalOptions="Center"
+                                       FontSize="14"
+                                       TextColor="#2D3748"
+                                       LineBreakMode="TailTruncation"/>
 
-                                    <Label Grid.Column="0" 
-                                           Text="{Binding Name}" 
-                                           VerticalOptions="Center"
-                                           FontSize="13"
-                                           TextColor="#2D3748"
-                                           LineBreakMode="TailTruncation"/>
+                                <!-- Кнопка "Сделать замер" только для точек замера - ТОЛЬКО БОЛЬШАЯ ИКОНКА -->
+                                <Button Grid.Column="1"
+                                        Text="📊"
+                                        Command="{Binding Path=BindingContext.TakeMeasurementCommand, Source={x:Reference treeView}}"
+                                        CommandParameter="{Binding .}"
+                                        Style="{StaticResource MeasurementPointButton}"
+                                        IsVisible="{Binding Name, Converter={StaticResource IsMeasurementPointConverter}}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </sfTreeView:SfTreeView.ItemTemplate>
 
-                                    <!-- Кнопка "Сделать замер" только для точек замера -->
-                                    <Button Grid.Column="1"
-                                            Text="📊 Замер"
-                                            Command="{Binding Path=BindingContext.TakeMeasurementCommand, Source={x:Reference treeView}}"
-                                            CommandParameter="{Binding .}"
-                                            Style="{StaticResource MeasurementPointButton}"
-                                            IsVisible="{Binding Name, Converter={StaticResource IsMeasurementPointConverter}}"/>
-                                </Grid>
-                            </DataTemplate>
-                        </sfTreeView:SfTreeView.ItemTemplate>
+                </sfTreeView:SfTreeView>
 
-                    </sfTreeView:SfTreeView>
+                <!-- Индикатор загрузки -->
+                <ActivityIndicator 
+                    IsVisible="{Binding IsLoading}"
+                    IsRunning="{Binding IsLoading}"
+                    VerticalOptions="Center"
+                    HorizontalOptions="Center"
+                    Color="#4361EE"
+                    HeightRequest="40"
+                    WidthRequest="40"/>
+            </Grid>
+        </Frame>
 
-                    <!-- Индикатор загрузки -->
-                    <ActivityIndicator 
-                        IsVisible="{Binding IsLoading}"
-                        IsRunning="{Binding IsLoading}"
-                        VerticalOptions="Center"
-                        HorizontalOptions="Center"
-                        Color="#4361EE"
-                        HeightRequest="40"
-                        WidthRequest="40"/>
-                </Grid>
-            </Frame>
-        </StackLayout>
-    </ScrollView>
+        <!-- ПАНЕЛЬ УПРАВЛЕНИЯ ДЕРЕВОМ - В САМОМ НИЗУ -->
+        <Frame Grid.Row="4" 
+               BackgroundColor="White" 
+               Padding="8">
+            <Grid ColumnSpacing="4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Управление деревом -->
+                <Button Grid.Column="0" 
+                        Text="📂 Развернуть все" 
+                        Command="{Binding ExpandAllCommand}"
+                        Style="{StaticResource SecondaryButton}"/>
+
+                <Button Grid.Column="1" 
+                        Text="📁 Свернуть все" 
+                        Command="{Binding CollapseAllCommand}"
+                        Style="{StaticResource SecondaryButton}"/>
+            </Grid>
+        </Frame>
+    </Grid>
 </ContentPage>
