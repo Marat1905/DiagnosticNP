@@ -1,81 +1,119 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:sfTreeView="clr-namespace:Syncfusion.XForms.TreeView;assembly=Syncfusion.SfTreeView.XForms"
+             xmlns:behaviors="clr-namespace:DiagnosticNP.Behaviors"
              x:Class="DiagnosticNP.Views.MainPage"
              Title="Вибродиагностика">
 
-    <ScrollView>
-        <StackLayout Padding="20">
-            <!-- NFC Секция -->
-            <Label Text="Данные NFC метки:" FontAttributes="Bold"/>
-            <Label Text="{Binding DiagnosticData.NFCData}" 
-                   BackgroundColor="LightGray" 
-                   Padding="10"/>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-            <Label Text="Время сканирования:" FontAttributes="Bold" Margin="0,10,0,0"/>
-            <Label Text="{Binding DiagnosticData.ScanTime}" 
-                   BackgroundColor="LightGray" 
-                   Padding="10"/>
+        <!-- Панель статуса -->
+        <Frame Grid.Row="0" BackgroundColor="LightBlue" Padding="10" Margin="5">
+            <Label Text="{Binding StatusMessage}" 
+                   FontSize="14" 
+                   TextColor="Black"
+                   HorizontalTextAlignment="Center"/>
+        </Frame>
 
-            <Button Text="Запуск сканирования NFC" 
-                    Command="{Binding StartListeningCommand}"
+        <!-- Панель поиска -->
+        <StackLayout Grid.Row="1" Orientation="Horizontal" Padding="10" Spacing="10">
+            <Entry Placeholder="Поиск по оборудованию..." 
+                   Text="{Binding SearchText}"
+                   HorizontalOptions="FillAndExpand"/>
+            <Button Text="🗘" 
+                    Command="{Binding LoadEquipmentCommand}"
+                    BackgroundColor="LightGray"
+                    WidthRequest="40"/>
+        </StackLayout>
+
+        <!-- Панель управления -->
+        <StackLayout Grid.Row="2" Orientation="Horizontal" Padding="10" Spacing="5">
+            <Button Text="Загрузить структуру" 
+                    Command="{Binding LoadEquipmentCommand}"
                     BackgroundColor="Green"
                     TextColor="White"
-                    Margin="0,20,0,0"/>
+                    HorizontalOptions="FillAndExpand"/>
 
-            <Button Text="Остановка сканирования NFC" 
-                    Command="{Binding StopListeningCommand}"
-                    BackgroundColor="Red"
-                    TextColor="White"
-                    Margin="0,10,0,0"/>
-
-            <Button Text="Прочитать NFC метку" 
-                    Command="{Binding ReadTagCommand}"
+            <Button Text="Выгрузить замеры" 
+                    Command="{Binding UploadMeasurementsCommand}"
                     BackgroundColor="Blue"
                     TextColor="White"
-                    Margin="0,10,0,0"/>
+                    HorizontalOptions="FillAndExpand"/>
 
-            <!-- Виброметр Секция -->
-            <Label Text="Данные виброметра:" FontAttributes="Bold" Margin="0,30,0,0"/>
+            <Button Text="Очистить" 
+                    Command="{Binding ClearMeasurementsCommand}"
+                    BackgroundColor="Red"
+                    TextColor="White"
+                    HorizontalOptions="FillAndExpand"/>
+        </StackLayout>
 
-            <Label Text="Последнее обновление:" FontAttributes="Italic"/>
-            <Label Text="{Binding LastAdvertising}" 
-                   BackgroundColor="LightBlue" 
-                   Padding="10"/>
+        <!-- Дерево оборудования с Behavior -->
+        <sfTreeView:SfTreeView Grid.Row="3"
+                               x:Name="treeView"
+                               ItemsSource="{Binding EquipmentNodes}"
+                               NotificationSubscriptionMode="CollectionChange"
+                               ChildPropertyName="Children"
+                               AutoExpandMode="None"
+                               SelectionMode="Single"
+                               SelectedItem="{Binding SelectedNode}"
+                               Indentation="20"
+                               ExpanderWidth="40">
 
-            <Label Text="Скорость (mm/s):"/>
-            <Label Text="{Binding Velocity}" 
-                   BackgroundColor="LightBlue" 
-                   Padding="10"/>
+            <sfTreeView:SfTreeView.Behaviors>
+                <behaviors:TreeViewBehavior 
+                    ExpandAll="{Binding ExpandAll, Mode=TwoWay}"
+                    CollapseAll="{Binding CollapseAll, Mode=TwoWay}"
+                    ExpandToNode="{Binding NodeToExpand, Mode=TwoWay}"/>
+            </sfTreeView:SfTreeView.Behaviors>
 
-            <Label Text="Ускорение (mm/s²):"/>
-            <Label Text="{Binding Acceleration}" 
-                   BackgroundColor="LightBlue" 
-                   Padding="10"/>
+            <sfTreeView:SfTreeView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Padding="10,5">
+                        <Label Text="{Binding Name}" 
+                               VerticalOptions="Center"
+                               FontSize="14"/>
+                    </Grid>
+                </DataTemplate>
+            </sfTreeView:SfTreeView.ItemTemplate>
 
-            <Label Text="Куртозис:"/>
-            <Label Text="{Binding Kurtosis}" 
-                   BackgroundColor="LightBlue" 
-                   Padding="10"/>
+        </sfTreeView:SfTreeView>
 
-            <Label Text="Температура (°C):"/>
-            <Label Text="{Binding Temperature}" 
-                   BackgroundColor="LightBlue" 
-                   Padding="10"/>
-
-            <Button Text="Запуск опроса виброметра" 
-                    Command="{Binding PollVibrometerCommand}"
-                    IsEnabled="{Binding IsNotPollingVibrometer}"
+        <!-- Панель действий -->
+        <StackLayout Grid.Row="4" Orientation="Horizontal" Padding="10" Spacing="10">
+            <Button Text="📈 Сделать замер" 
+                    Command="{Binding TakeMeasurementCommand}"
                     BackgroundColor="DarkGreen"
                     TextColor="White"
-                    Margin="0,10,0,0"/>
+                    HorizontalOptions="FillAndExpand"
+                    HeightRequest="50"/>
 
-            <Button Text="Остановка опроса" 
-                    Command="{Binding StopVibrometerCommand}"
-                    IsEnabled="{Binding IsPollingVibrometer}"
-                    BackgroundColor="DarkRed"
-                    TextColor="White"
-                    Margin="0,10,0,0"/>
+            <StackLayout Orientation="Vertical" Spacing="5">
+                <Button Text="📂 Развернуть" 
+                        Command="{Binding ExpandAllCommand}"
+                        BackgroundColor="Gray"
+                        TextColor="White"/>
+                <Button Text="📁 Свернуть" 
+                        Command="{Binding CollapseAllCommand}"
+                        BackgroundColor="Gray"
+                        TextColor="White"/>
+            </StackLayout>
         </StackLayout>
-    </ScrollView>
+
+        <!-- Индикатор загрузки -->
+        <ActivityIndicator Grid.Row="3" 
+                          Grid.RowSpan="2"
+                          IsVisible="{Binding IsLoading}"
+                          IsRunning="{Binding IsLoading}"
+                          VerticalOptions="Center"
+                          HorizontalOptions="Center"
+                          Color="Blue"/>
+    </Grid>
 </ContentPage>

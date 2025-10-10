@@ -67,6 +67,9 @@
     <PackageReference Include="Syncfusion.Xamarin.Buttons">
       <Version>20.2.0.50</Version>
     </PackageReference>
+    <PackageReference Include="Syncfusion.Xamarin.Core">
+      <Version>20.2.0.50</Version>
+    </PackageReference>
     <PackageReference Include="Syncfusion.Xamarin.SfTreeView">
       <Version>20.2.0.50</Version>
     </PackageReference>
@@ -77,6 +80,7 @@
     <Compile Include="Bluetooth\GATTConetionTools.cs" />
     <Compile Include="Bluetooth\ViPenLeScanner.cs" />
     <Compile Include="Bluetooth\VPenControl.cs" />
+    <Compile Include="DatabasePathAndroid.cs" />
     <Compile Include="MainActivity.cs" />
     <Compile Include="Resources\Resource.designer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

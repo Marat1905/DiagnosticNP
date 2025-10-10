@@ -1,0 +1,115 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DiagnosticNP.Views.MeasurementPage"
+             Title="Новый замер">
+
+    <ScrollView>
+        <StackLayout Padding="20" Spacing="15">
+
+            <!-- Информация о точке замера -->
+            <Frame BackgroundColor="LightBlue" Padding="10">
+                <StackLayout>
+                    <Label Text="Точка замера:" FontAttributes="Bold"/>
+                    <Label Text="{Binding EquipmentPath}" 
+                           FontSize="14"/>
+                    <Label Text="Тип замера:" FontAttributes="Bold" Margin="0,10,0,0"/>
+                    <Label Text="{Binding MeasurementType}" 
+                           FontSize="14"
+                           TextColor="DarkGreen"/>
+                </StackLayout>
+            </Frame>
+
+            <!-- Статус виброметра -->
+            <Frame BackgroundColor="LightYellow" Padding="15" IsVisible="{Binding IsVibrometerConnected}">
+                <StackLayout>
+                    <Label Text="Виброметр ViPen" FontAttributes="Bold" FontSize="16"/>
+                    <Label Text="{Binding VibrometerStatus}" 
+                           FontSize="14"
+                           TextColor="DarkBlue"/>
+                    <ActivityIndicator IsVisible="{Binding IsReadingData}" 
+                                     IsRunning="{Binding IsReadingData}"
+                                     Color="Blue"/>
+                </StackLayout>
+            </Frame>
+
+            <!-- Поля ввода данных -->
+            <Frame BackgroundColor="White" Padding="15">
+                <StackLayout Spacing="10">
+
+                    <!-- Скорость вибрации -->
+                    <StackLayout>
+                        <Label Text="Скорость вибрации (мм/с):" FontAttributes="Bold"/>
+                        <Entry Keyboard="Numeric"
+                               Text="{Binding Velocity}"
+                               Placeholder="0.00"/>
+                    </StackLayout>
+
+                    <!-- Температура -->
+                    <StackLayout>
+                        <Label Text="Температура (°C):" FontAttributes="Bold"/>
+                        <Entry Keyboard="Numeric"
+                               Text="{Binding Temperature}"
+                               Placeholder="0.0"/>
+                    </StackLayout>
+
+                    <!-- Ускорение -->
+                    <StackLayout>
+                        <Label Text="Ускорение (м/с²):" FontAttributes="Bold"/>
+                        <Entry Keyboard="Numeric"
+                               Text="{Binding Acceleration}"
+                               Placeholder="0.00"/>
+                    </StackLayout>
+
+                    <!-- Куртозис -->
+                    <StackLayout>
+                        <Label Text="Куртозис:" FontAttributes="Bold"/>
+                        <Entry Keyboard="Numeric"
+                               Text="{Binding Kurtosis}"
+                               Placeholder="0.00"/>
+                    </StackLayout>
+
+                    <!-- Время замера -->
+                    <StackLayout>
+                        <Label Text="Время замера:" FontAttributes="Bold"/>
+                        <StackLayout Orientation="Horizontal" Spacing="10">
+                            <DatePicker Date="{Binding MeasurementTime, Mode=TwoWay}"
+                                        HorizontalOptions="FillAndExpand"/>
+                            <TimePicker Time="{Binding MeasurementTime, Mode=TwoWay}"
+                                        HorizontalOptions="FillAndExpand"/>
+                            <Button Text="Сейчас" 
+                                    Command="{Binding UseCurrentTimeCommand}"
+                                    BackgroundColor="LightGray"
+                                    WidthRequest="70"/>
+                        </StackLayout>
+                    </StackLayout>
+
+                </StackLayout>
+            </Frame>
+
+            <!-- Кнопка чтения с виброметра -->
+            <Button Text="📊 Прочитать с виброметра" 
+                    Command="{Binding ReadFromVibrometerCommand}"
+                    BackgroundColor="Green"
+                    TextColor="White"
+                    IsEnabled="{Binding IsVibrometerConnected}"
+                    HeightRequest="50"/>
+
+            <!-- Кнопки действий -->
+            <StackLayout Orientation="Horizontal" Spacing="10">
+                <Button Text="Отмена" 
+                        Clicked="OnCancelClicked"
+                        BackgroundColor="Gray"
+                        TextColor="White"
+                        HorizontalOptions="FillAndExpand"/>
+
+                <Button Text="💾 Сохранить" 
+                        Command="{Binding SaveMeasurementCommand}"
+                        BackgroundColor="DarkGreen"
+                        TextColor="White"
+                        HorizontalOptions="FillAndExpand"/>
+            </StackLayout>
+
+        </StackLayout>
+    </ScrollView>
+</ContentPage>

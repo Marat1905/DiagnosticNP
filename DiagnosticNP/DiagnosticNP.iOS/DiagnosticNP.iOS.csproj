@@ -135,6 +135,9 @@
     <PackageReference Include="Syncfusion.Xamarin.Buttons">
       <Version>20.2.0.50</Version>
     </PackageReference>
+    <PackageReference Include="Syncfusion.Xamarin.Core">
+      <Version>20.2.0.50</Version>
+    </PackageReference>
     <PackageReference Include="Syncfusion.Xamarin.SfTreeView">
       <Version>20.2.0.50</Version>
     </PackageReference>

@@ -1,11 +1,4 @@
-﻿using DiagnosticNP.ViewModels;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Xamarin.Forms;
+﻿using Xamarin.Forms;
 
 namespace DiagnosticNP.Views
 {
@@ -14,7 +7,20 @@ namespace DiagnosticNP.Views
         public MainPage()
         {
             InitializeComponent();
-            BindingContext = new MainViewModel();
+        }
+
+        protected override void OnAppearing()
+        {
+            base.OnAppearing();
+        }
+
+        protected override void OnDisappearing()
+        {
+            //base.OnDisappearing();
+            //if (BindingContext is ViewModels.MainViewModel vm)
+            //{
+            //    vm.OnDisappearing();
+            //}
         }
     }
 }
