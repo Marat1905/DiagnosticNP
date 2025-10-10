@@ -27,6 +27,10 @@
                     <Label Text="{Binding MeasurementType}" 
                            FontSize="14"
                            TextColor="DarkGreen"/>
+                    <Label Text="Время замера:" FontAttributes="Bold" Margin="0,10,0,0"/>
+                    <Label Text="{Binding MeasurementTime, StringFormat='{0:dd.MM.yyyy HH:mm:ss}'}" 
+                           FontSize="14"
+                           TextColor="DarkBlue"/>
                 </StackLayout>
             </Frame>
 
@@ -140,36 +144,12 @@
                                Text="{Binding Kurtosis, Converter={StaticResource DoubleConverter}}"
                                Placeholder="0.00"/>
                     </StackLayout>
-
-                    <!-- Время замера -->
-                    <StackLayout>
-                        <Label Text="Время замера:" FontAttributes="Bold" FontSize="12" Margin="0,10,0,0"/>
-                        <StackLayout Orientation="Horizontal" Spacing="10">
-                            <DatePicker Date="{Binding MeasurementTime, Mode=TwoWay}"
-                                        HorizontalOptions="FillAndExpand"/>
-                            <TimePicker Time="{Binding MeasurementTime, Mode=TwoWay}"
-                                        HorizontalOptions="FillAndExpand"/>
-                            <Button Text="Сейчас" 
-                                    Command="{Binding UseCurrentTimeCommand}"
-                                    BackgroundColor="LightGray"
-                                    WidthRequest="70"
-                                    FontSize="10"/>
-                        </StackLayout>
-                    </StackLayout>
                 </StackLayout>
             </Frame>
 
             <!-- Управление виброметром -->
             <StackLayout Spacing="10">
                 <Label Text="Управление виброметром" FontAttributes="Bold" FontSize="14"/>
-
-                <!-- Кнопка чтения данных -->
-                <Button Text="📊 Прочитать данные с виброметра" 
-                        Command="{Binding ReadFromVibrometerCommand}"
-                        BackgroundColor="Green"
-                        TextColor="White"
-                        HeightRequest="45"
-                        FontSize="14"/>
 
                 <!-- Кнопки опроса -->
                 <StackLayout Orientation="Horizontal" Spacing="10">

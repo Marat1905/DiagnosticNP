@@ -112,16 +112,12 @@ namespace DiagnosticNP.ViewModels
         }
 
         public ICommand SaveMeasurementCommand { get; private set; }
-        public ICommand ReadFromVibrometerCommand { get; private set; }
-        public ICommand UseCurrentTimeCommand { get; private set; }
         public ICommand StartPollingCommand { get; private set; }
         public ICommand StopPollingCommand { get; private set; }
 
         private void InitializeCommands()
         {
             SaveMeasurementCommand = new Command(async () => await SaveMeasurement());
-            ReadFromVibrometerCommand = new Command(async () => await ReadFromVibrometer());
-            UseCurrentTimeCommand = new Command(() => MeasurementTime = DateTime.Now);
             StartPollingCommand = new Command(async () => await StartPolling());
             StopPollingCommand = new Command(async () => await StopPolling());
         }
@@ -186,37 +182,6 @@ namespace DiagnosticNP.ViewModels
             System.Diagnostics.Debug.WriteLine($"After assignment - Velocity: {_velocity}");
         }
 
-        private async Task ReadFromVibrometer()
-        {
-            if (!_vibrometerService.IsConnected)
-            {
-                IsReadingData = true;
-                VibrometerStatus = "Подключение к виброметру...";
-
-                try
-                {
-                    var connected = await _vibrometerService.ConnectAsync();
-                    if (!connected)
-                    {
-                        await Application.Current.MainPage.DisplayAlert("Ошибка",
-                            "Не удалось подключиться к виброметру", "OK");
-                        IsReadingData = false;
-                        return;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    await Application.Current.MainPage.DisplayAlert("Ошибка",
-                        $"Ошибка подключения: {ex.Message}", "OK");
-                    IsReadingData = false;
-                    return;
-                }
-            }
-
-            // Данные автоматически придут через событие DataReceived
-            VibrometerStatus = "Ожидание данных от виброметра...";
-        }
-
         private async Task StartPolling()
         {
             if (IsPollingVibrometer) return;
@@ -266,6 +231,9 @@ namespace DiagnosticNP.ViewModels
 
             try
             {
+                // Обновляем время замера на текущее перед сохранением
+                MeasurementTime = DateTime.Now;
+
                 var measurement = new Measurement
                 {
                     EquipmentNodeId = _equipmentNode.Id,
@@ -304,12 +272,6 @@ namespace DiagnosticNP.ViewModels
             if (Temperature < -273)
             {
                 Application.Current.MainPage.DisplayAlert("Ошибка", "Некорректная температура", "OK");
-                return false;
-            }
-
-            if (MeasurementTime > DateTime.Now.AddMinutes(5))
-            {
-                Application.Current.MainPage.DisplayAlert("Ошибка", "Время замера не может быть в будущем", "OK");
                 return false;
             }
 
