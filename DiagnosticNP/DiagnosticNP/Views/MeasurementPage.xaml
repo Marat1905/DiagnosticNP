@@ -47,7 +47,7 @@
                     <StackLayout>
                         <Label Text="Скорость вибрации (мм/с):" FontAttributes="Bold"/>
                         <Entry Keyboard="Numeric"
-                               Text="{Binding Velocity}"
+                               Text="{Binding Velocity1}"
                                Placeholder="0.00"/>
                     </StackLayout>
 
