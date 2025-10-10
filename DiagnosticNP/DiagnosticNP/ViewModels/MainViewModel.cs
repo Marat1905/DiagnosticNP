@@ -1,11 +1,8 @@
 ﻿using DiagnosticNP.Models;
-using DiagnosticNP.Models.Vibrometer;
 using DiagnosticNP.Services;
 using DiagnosticNP.Services.Api;
-using DiagnosticNP.Services.Bluetooth;
 using DiagnosticNP.Services.Nfc;
 using DiagnosticNP.Services.Repository;
-using DiagnosticNP.Services.Utils;
 using DiagnosticNP.Views;
 using System;
 using System.Collections.Generic;
@@ -28,7 +25,6 @@ namespace DiagnosticNP.ViewModels
         private string _searchText;
         private bool _isLoading;
         private string _statusMessage;
-        private string _vibrometerDevice;
         private bool _isNfcInitialized;
         private CancellationTokenSource _nfcProcessingCancellation;
 
@@ -45,7 +41,6 @@ namespace DiagnosticNP.ViewModels
 
             InitializeCommands();
             InitializeNfc();
-            InitializeVibrometer();
             LoadEquipmentStructure();
         }
 
@@ -268,7 +263,7 @@ namespace DiagnosticNP.ViewModels
                 return;
             }
 
-            var measurementVm = new MeasurementViewModel(SelectedNode, _repository, _vibrometerDevice);
+            var measurementVm = new MeasurementViewModel(SelectedNode, _repository);
             await Application.Current.MainPage.Navigation.PushAsync(new MeasurementPage(measurementVm));
         }
 
@@ -474,48 +469,10 @@ namespace DiagnosticNP.ViewModels
             }
         }
 
-        private void InitializeVibrometer()
-        {
-            try
-            {
-                if (!BluetoothController.LeScanner.IsRunning)
-                    BluetoothController.LeScanner.Start();
-
-                BluetoothController.LeScanner.NewData += OnVibrometerDataReceived;
-                StatusMessage = "Сканирование виброметра запущено";
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Ошибка инициализации виброметра: {ex.Message}";
-            }
-        }
-
-        private void OnVibrometerDataReceived(object sender, BleDataEventArgs e)
-        {
-            Device.BeginInvokeOnMainThread(() => ProcessVibrometerData(e));
-        }
-
-        private void ProcessVibrometerData(BleDataEventArgs e)
-        {
-            try
-            {
-                _vibrometerDevice = e.Data.Address;
-                var data = e.Data.Data.BytesToStruct<ViPenAdvertising>();
-
-                StatusMessage = $"Виброметр обнаружен: {_vibrometerDevice}";
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Vibrometer data processing error: {ex.Message}");
-            }
-        }
-
         public void OnDisappearing()
         {
             try
             {
-                BluetoothController.LeScanner.NewData -= OnVibrometerDataReceived;
-
                 if (_isNfcInitialized)
                 {
                     _nfcService.TagScanned -= OnTagScanned;

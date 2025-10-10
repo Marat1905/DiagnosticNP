@@ -25,31 +25,26 @@ namespace DiagnosticNP.ViewModels
         private double _acceleration;
         private double _kurtosis;
         private DateTime _measurementTime;
-        private bool _isVibrometerConnected;
         private string _vibrometerStatus;
         private bool _isReadingData;
+        private bool _isPollingVibrometer;
+        private string _vibrometerDevice;
+        private DateTime _lastAdvertising;
 
-        public MeasurementViewModel(EquipmentNode equipmentNode, IRepository repository, string vibrometerDeviceAddress)
+        public MeasurementViewModel(EquipmentNode equipmentNode, IRepository repository)
         {
             _equipmentNode = equipmentNode;
             _repository = repository;
-            VibrometerDeviceAddress = vibrometerDeviceAddress;
             _measurementTime = DateTime.Now;
             _operationToken = new OperationToken();
 
             InitializeCommands();
             InitializeVibrometerController();
-
-            // Автоматическое подключение к виброметру при создании
-            if (!string.IsNullOrEmpty(VibrometerDeviceAddress))
-            {
-                Task.Run(async () => await ConnectVibrometer());
-            }
+            InitializeVibrometerScanning();
         }
 
         public string EquipmentPath => _equipmentNode?.FullPath ?? "Неизвестно";
         public string MeasurementType => _equipmentNode?.Name ?? "Неизвестно";
-        public string VibrometerDeviceAddress { get; }
 
         public double Velocity
         {
@@ -81,12 +76,6 @@ namespace DiagnosticNP.ViewModels
             set => SetProperty(ref _measurementTime, value);
         }
 
-        public bool IsVibrometerConnected
-        {
-            get => _isVibrometerConnected;
-            set => SetProperty(ref _isVibrometerConnected, value);
-        }
-
         public string VibrometerStatus
         {
             get => _vibrometerStatus;
@@ -99,15 +88,31 @@ namespace DiagnosticNP.ViewModels
             set => SetProperty(ref _isReadingData, value);
         }
 
+        public bool IsPollingVibrometer
+        {
+            get => _isPollingVibrometer;
+            set => SetProperty(ref _isPollingVibrometer, value);
+        }
+
+        public DateTime LastAdvertising
+        {
+            get => _lastAdvertising;
+            set => SetProperty(ref _lastAdvertising, value);
+        }
+
         public ICommand SaveMeasurementCommand { get; private set; }
         public ICommand ReadFromVibrometerCommand { get; private set; }
         public ICommand UseCurrentTimeCommand { get; private set; }
+        public ICommand StartPollingCommand { get; private set; }
+        public ICommand StopPollingCommand { get; private set; }
 
         private void InitializeCommands()
         {
             SaveMeasurementCommand = new Command(async () => await SaveMeasurement());
             ReadFromVibrometerCommand = new Command(async () => await ReadFromVibrometer());
             UseCurrentTimeCommand = new Command(() => MeasurementTime = DateTime.Now);
+            StartPollingCommand = new Command(async () => await StartPolling());
+            StopPollingCommand = new Command(() => StopPolling());
         }
 
         private void InitializeVibrometerController()
@@ -115,10 +120,58 @@ namespace DiagnosticNP.ViewModels
             _vibrometerController = VPenControlManager.GetController();
         }
 
-        private async Task ConnectVibrometer()
+        private void InitializeVibrometerScanning()
         {
-            if (IsVibrometerConnected || string.IsNullOrEmpty(VibrometerDeviceAddress))
-                return;
+            try
+            {
+                if (!BluetoothController.LeScanner.IsRunning)
+                    BluetoothController.LeScanner.Start();
+
+                BluetoothController.LeScanner.NewData += OnVibrometerDataReceived;
+                VibrometerStatus = "Сканирование виброметра запущено";
+            }
+            catch (Exception ex)
+            {
+                VibrometerStatus = $"Ошибка инициализации виброметра: {ex.Message}";
+            }
+        }
+
+        private void OnVibrometerDataReceived(object sender, BleDataEventArgs e)
+        {
+            Device.BeginInvokeOnMainThread(() => ProcessVibrometerData(e));
+        }
+
+        private void ProcessVibrometerData(BleDataEventArgs e)
+        {
+            try
+            {
+                // Не обрабатываем advertising данные во время активного опроса
+                if (IsPollingVibrometer) return;
+
+                _vibrometerDevice = e.Data.Address;
+                var data = e.Data.Data.BytesToStruct<ViPenAdvertising>();
+
+                Velocity = Math.Round(data.Velocity * 0.01, 2);
+                Acceleration = Math.Round(data.Acceleration * 0.01, 2);
+                Kurtosis = Math.Round(data.Kurtosis * 0.01, 2);
+                Temperature = Math.Round(data.Temperature * 0.01, 2);
+                LastAdvertising = DateTime.Now;
+
+                VibrometerStatus = $"Данные получены: {_vibrometerDevice}";
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Vibrometer data processing error: {ex.Message}");
+            }
+        }
+
+        private async Task<bool> ConnectToVibrometer()
+        {
+            if (string.IsNullOrEmpty(_vibrometerDevice))
+            {
+                VibrometerStatus = "Виброметр не обнаружен";
+                return false;
+            }
 
             IsReadingData = true;
             VibrometerStatus = "Подключение к виброметру...";
@@ -127,28 +180,23 @@ namespace DiagnosticNP.ViewModels
             {
                 _cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-                var connected = await _vibrometerController.ConnectAsync(VibrometerDeviceAddress, _operationToken);
+                var connected = await _vibrometerController.ConnectAsync(_vibrometerDevice, _operationToken);
 
                 if (connected)
                 {
-                    IsVibrometerConnected = true;
                     VibrometerStatus = "Виброметр подключен";
-
-                    // Автоматически читаем данные после подключения
-                    await ReadFromVibrometer();
+                    return true;
                 }
                 else
                 {
                     VibrometerStatus = "Ошибка подключения";
-                    await Application.Current.MainPage.DisplayAlert("Ошибка",
-                        "Не удалось подключиться к виброметру", "OK");
+                    return false;
                 }
             }
             catch (Exception ex)
             {
                 VibrometerStatus = $"Ошибка подключения: {ex.Message}";
-                await Application.Current.MainPage.DisplayAlert("Ошибка",
-                    $"Ошибка при подключении к виброметру: {ex.Message}", "OK");
+                return false;
             }
             finally
             {
@@ -156,12 +204,26 @@ namespace DiagnosticNP.ViewModels
             }
         }
 
+        private async Task DisconnectFromVibrometer()
+        {
+            try
+            {
+                await _vibrometerController.Stop(_vibrometerDevice, _operationToken);
+                await _vibrometerController.Disconnect();
+                VibrometerStatus = "Виброметр отключен";
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error disconnecting vibrometer: {ex.Message}");
+            }
+        }
+
         private async Task ReadFromVibrometer()
         {
-            if (!IsVibrometerConnected)
+            if (string.IsNullOrEmpty(_vibrometerDevice))
             {
                 await Application.Current.MainPage.DisplayAlert("Внимание",
-                    "Виброметр не подключен", "OK");
+                    "Виброметр не обнаружен", "OK");
                 return;
             }
 
@@ -172,7 +234,18 @@ namespace DiagnosticNP.ViewModels
             {
                 _cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-                var userData = await _vibrometerController.ReadUserData(VibrometerDeviceAddress, _operationToken);
+                // Автоматически подключаемся если не подключены
+                if (!_vibrometerController.IsConnected)
+                {
+                    if (!await ConnectToVibrometer())
+                    {
+                        await Application.Current.MainPage.DisplayAlert("Ошибка",
+                            "Не удалось подключиться к виброметру", "OK");
+                        return;
+                    }
+                }
+
+                var userData = await _vibrometerController.ReadUserData(_vibrometerDevice, _operationToken);
 
                 if (userData.Values != null && userData.Values.Length >= 4)
                 {
@@ -200,6 +273,165 @@ namespace DiagnosticNP.ViewModels
             finally
             {
                 IsReadingData = false;
+            }
+        }
+
+        private async Task StartPolling()
+        {
+            if (IsPollingVibrometer) return;
+
+            if (string.IsNullOrEmpty(_vibrometerDevice))
+            {
+                await Application.Current.MainPage.DisplayAlert("Внимание",
+                    "Виброметр не обнаружен", "OK");
+                return;
+            }
+
+            IsPollingVibrometer = true;
+            VibrometerStatus = "Запуск опроса виброметра...";
+
+            try
+            {
+                // Останавливаем автоматическое сканирование
+                BluetoothController.LeScanner.Stop();
+
+                // Автоматически подключаемся
+                if (!await ConnectToVibrometer())
+                {
+                    await Application.Current.MainPage.DisplayAlert("Ошибка",
+                        "Не удалось подключиться к виброметру", "OK");
+                    IsPollingVibrometer = false;
+                    return;
+                }
+
+                await _vibrometerController.Start(_vibrometerDevice, _operationToken);
+
+                VibrometerStatus = "Опрос виброметра запущен";
+
+                // Запускаем цикл опроса
+                _ = Task.Run(async () => await PollVibrometerLoop());
+            }
+            catch (Exception ex)
+            {
+                VibrometerStatus = $"Ошибка запуска опроса: {ex.Message}";
+                await Application.Current.MainPage.DisplayAlert("Ошибка",
+                    $"Ошибка при запуске опроса виброметра: {ex.Message}", "OK");
+                IsPollingVibrometer = false;
+            }
+        }
+
+        private async void StopPolling()
+        {
+            if (!IsPollingVibrometer) return;
+
+            IsPollingVibrometer = false;
+            VibrometerStatus = "Остановка опроса виброметра...";
+
+            try
+            {
+                await _vibrometerController.Stop(_vibrometerDevice, _operationToken);
+                await DisconnectFromVibrometer();
+                VibrometerStatus = "Опрос виброметра остановлен";
+
+                // Восстанавливаем сканирование
+                if (!BluetoothController.LeScanner.IsRunning)
+                {
+                    BluetoothController.LeScanner.Start();
+                }
+            }
+            catch (Exception ex)
+            {
+                VibrometerStatus = $"Ошибка остановки опроса: {ex.Message}";
+            }
+        }
+
+        private async Task PollVibrometerLoop()
+        {
+            int consecutiveErrors = 0;
+            const int maxConsecutiveErrors = 3;
+
+            while (IsPollingVibrometer)
+            {
+                try
+                {
+                    if (!_vibrometerController.IsConnected)
+                    {
+                        consecutiveErrors++;
+                        if (consecutiveErrors > maxConsecutiveErrors)
+                        {
+                            Device.BeginInvokeOnMainThread(() =>
+                            {
+                                VibrometerStatus = "Соединение потеряно";
+                                IsPollingVibrometer = false;
+                            });
+                            break;
+                        }
+
+                        // Попытка переподключения
+                        if (await ConnectToVibrometer())
+                        {
+                            consecutiveErrors = 0;
+                            await _vibrometerController.Start(_vibrometerDevice, _operationToken);
+                        }
+                        else
+                        {
+                            await Task.Delay(1000);
+                        }
+                        continue;
+                    }
+
+                    var userData = await _vibrometerController.ReadUserData(_vibrometerDevice, _operationToken);
+
+                    if (userData.Values != null && userData.Values.Length >= 4)
+                    {
+                        Device.BeginInvokeOnMainThread(() =>
+                        {
+                            Velocity = Math.Round(userData.Values[0] * 0.01, 2);
+                            Acceleration = Math.Round(userData.Values[1] * 0.01, 2);
+                            Kurtosis = Math.Round(userData.Values[2] * 0.01, 2);
+                            Temperature = Math.Round(userData.Values[3] * 0.01, 2);
+                            MeasurementTime = DateTime.Now;
+                            LastAdvertising = DateTime.Now;
+                        });
+
+                        consecutiveErrors = 0;
+                    }
+
+                    await Task.Delay(500); // Пауза между опросами
+                }
+                catch (Exception ex)
+                {
+                    consecutiveErrors++;
+                    System.Diagnostics.Debug.WriteLine($"Polling error: {ex.Message}");
+
+                    if (consecutiveErrors > maxConsecutiveErrors)
+                    {
+                        Device.BeginInvokeOnMainThread(() =>
+                        {
+                            VibrometerStatus = "Ошибка опроса виброметра";
+                            IsPollingVibrometer = false;
+                        });
+                        break;
+                    }
+
+                    await Task.Delay(1000);
+                }
+            }
+
+            // Автоматически отключаемся при выходе из цикла
+            try
+            {
+                await DisconnectFromVibrometer();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error disconnecting after polling: {ex.Message}");
+            }
+
+            // Восстанавливаем сканирование при выходе из цикла
+            if (!BluetoothController.LeScanner.IsRunning)
+            {
+                BluetoothController.LeScanner.Start();
             }
         }
 
@@ -268,24 +500,35 @@ namespace DiagnosticNP.ViewModels
 
                 try
                 {
+                    // Останавливаем опрос
+                    IsPollingVibrometer = false;
+
                     _cancellationTokenSource?.Cancel();
                     _cancellationTokenSource?.Dispose();
 
+                    // Отписываемся от событий сканера
+                    BluetoothController.LeScanner.NewData -= OnVibrometerDataReceived;
+
+                    // Автоматически отключаем виброметр
                     if (_vibrometerController != null)
                     {
-                        if (IsVibrometerConnected)
+                        try
                         {
-                            try
-                            {
-                                _vibrometerController.Stop(VibrometerDeviceAddress, _operationToken).Wait(TimeSpan.FromSeconds(3));
-                                _vibrometerController.Disconnect().Wait(TimeSpan.FromSeconds(3));
-                            }
-                            catch
-                            {
-                            }
+                            _vibrometerController.Stop(_vibrometerDevice, _operationToken).Wait(TimeSpan.FromSeconds(3));
+                            _vibrometerController.Disconnect().Wait(TimeSpan.FromSeconds(3));
+                        }
+                        catch
+                        {
+                            // Игнорируем ошибки при отключении
                         }
 
                         _vibrometerController.Dispose();
+                    }
+
+                    // Восстанавливаем сканирование если было остановлено
+                    if (!BluetoothController.LeScanner.IsRunning)
+                    {
+                        BluetoothController.LeScanner.Start();
                     }
 
                     //_operationToken?.Dispose();

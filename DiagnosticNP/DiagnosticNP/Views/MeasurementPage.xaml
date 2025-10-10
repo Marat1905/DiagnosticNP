@@ -21,12 +21,18 @@
             </Frame>
 
             <!-- Статус виброметра -->
-            <Frame BackgroundColor="LightYellow" Padding="15" IsVisible="{Binding IsVibrometerConnected}">
+            <Frame BackgroundColor="LightYellow" Padding="15">
                 <StackLayout>
                     <Label Text="Виброметр ViPen" FontAttributes="Bold" FontSize="16"/>
                     <Label Text="{Binding VibrometerStatus}" 
                            FontSize="14"
                            TextColor="DarkBlue"/>
+
+                    <Label Text="Последнее обновление:" FontAttributes="Italic" Margin="0,10,0,0"/>
+                    <Label Text="{Binding LastAdvertising}" 
+                           FontSize="12"
+                           TextColor="Gray"/>
+
                     <ActivityIndicator IsVisible="{Binding IsReadingData}" 
                                      IsRunning="{Binding IsReadingData}"
                                      Color="Blue"/>
@@ -87,13 +93,34 @@
                 </StackLayout>
             </Frame>
 
-            <!-- Кнопка чтения с виброметра -->
-            <Button Text="📊 Прочитать с виброметра" 
-                    Command="{Binding ReadFromVibrometerCommand}"
-                    BackgroundColor="Green"
-                    TextColor="White"
-                    IsEnabled="{Binding IsVibrometerConnected}"
-                    HeightRequest="50"/>
+            <!-- Управление виброметром -->
+            <StackLayout Spacing="10">
+
+                <!-- Кнопка чтения данных -->
+                <Button Text="📊 Прочитать данные с виброметра" 
+                        Command="{Binding ReadFromVibrometerCommand}"
+                        BackgroundColor="Green"
+                        TextColor="White"
+                        HeightRequest="50"/>
+
+                <!-- Кнопки опроса -->
+                <StackLayout Orientation="Horizontal" Spacing="10">
+                    <Button Text="▶ Запуск опроса" 
+                            Command="{Binding StartPollingCommand}"
+                            BackgroundColor="DarkGreen"
+                            TextColor="White"
+                            HorizontalOptions="FillAndExpand"
+                            IsEnabled="{Binding IsPollingVibrometer, Converter={StaticResource InverseBooleanConverter}}"/>
+
+                    <Button Text="⏹ Остановка опроса" 
+                            Command="{Binding StopPollingCommand}"
+                            BackgroundColor="DarkRed"
+                            TextColor="White"
+                            HorizontalOptions="FillAndExpand"
+                            IsEnabled="{Binding IsPollingVibrometer}"/>
+                </StackLayout>
+
+            </StackLayout>
 
             <!-- Кнопки действий -->
             <StackLayout Orientation="Horizontal" Spacing="10">
