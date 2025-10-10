@@ -25,7 +25,7 @@
                 <Setter Property="BackgroundColor" Value="#4361EE"/>
                 <Setter Property="TextColor" Value="White"/>
                 <Setter Property="CornerRadius" Value="10"/>
-                <Setter Property="HeightRequest" Value="50"/>
+                <Setter Property="HeightRequest" Value="55"/>
                 <Setter Property="FontSize" Value="14"/>
                 <Setter Property="FontAttributes" Value="Bold"/>
             </Style>
@@ -34,7 +34,7 @@
                 <Setter Property="BackgroundColor" Value="#38B000"/>
                 <Setter Property="TextColor" Value="White"/>
                 <Setter Property="CornerRadius" Value="10"/>
-                <Setter Property="HeightRequest" Value="50"/>
+                <Setter Property="HeightRequest" Value="55"/>
                 <Setter Property="FontSize" Value="14"/>
                 <Setter Property="FontAttributes" Value="Bold"/>
             </Style>
@@ -43,7 +43,7 @@
                 <Setter Property="BackgroundColor" Value="#E63946"/>
                 <Setter Property="TextColor" Value="White"/>
                 <Setter Property="CornerRadius" Value="10"/>
-                <Setter Property="HeightRequest" Value="50"/>
+                <Setter Property="HeightRequest" Value="55"/>
                 <Setter Property="FontSize" Value="14"/>
             </Style>
 
@@ -51,7 +51,7 @@
                 <Setter Property="BackgroundColor" Value="#6C757D"/>
                 <Setter Property="TextColor" Value="White"/>
                 <Setter Property="CornerRadius" Value="10"/>
-                <Setter Property="HeightRequest" Value="50"/>
+                <Setter Property="HeightRequest" Value="55"/>
                 <Setter Property="FontSize" Value="14"/>
             </Style>
 
